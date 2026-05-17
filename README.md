@@ -1,3 +1,44 @@
+## About Smartmontools SDK
+
+This is a fork of [smartmontools/smartmontools](https://github.com/smartmontools/smartmontools)
+with **libsmartctl** shared library support, maintained for the
+[smartmontools-go](https://github.com/dianlight/smartmontools-go) project.
+
+### What's different
+
+- **`libsmartctl.so` / `libsmartctl.dylib`** — shared library target via `--enable-libsmartctl`
+- **C API** (`src/libsmartctl.h`) — stable interface for FFI consumers (purego, CGO)
+- **Weekly upstream sync** — automated rebase via `sync-upstream.yml`
+
+### Building the shared library
+
+```bash
+./autogen.sh
+./configure --enable-shared --disable-static --enable-libsmartctl \
+  CFLAGS="-fPIC" CXXFLAGS="-fPIC -DBUILDING_LIBSMARTCTL"
+make -j$(nproc)
+```
+
+The library will be at `src/.libs/libsmartctl.so` (Linux) or
+`src/.libs/libsmartctl.dylib` (macOS).
+
+### C API
+
+See `src/libsmartctl.h` for the full API. Key functions:
+
+| Function | Description |
+|----------|-------------|
+| `smartctl_init()` | Create execution context |
+| `smartctl_scan_devices()` | Enumerate storage devices (JSON) |
+| `smartctl_get_smart_data()` | Get full SMART data (JSON) |
+| `smartctl_check_health()` | Overall health assessment |
+| `smartctl_run_selftest()` | Start a self-test |
+| `smartctl_enable_smart()` / `smartctl_disable_smart()` | Toggle SMART |
+| `smartctl_abort_selftest()` | Abort running test |
+| `smartctl_destroy()` | Free context |
+
+---
+
 ## About Smartmontools
 The smartmontools package contains two utility programs (`smartctl` and `smartd`) 
 to control and monitor storage systems using the **Self-Monitoring, Analysis and 
