@@ -19,7 +19,7 @@ jobs:
 
       - name: Configure git
         run: |
-          git config user.name "smartmontools-go bot"
+          git config user.name "smartmontools-sdk bot"
           git config user.email "bot@dianlight.github.io"
 
       - name: Add upstream remote

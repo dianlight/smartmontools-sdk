@@ -1,9 +1,9 @@
-name: Build smartmontools on macOS
+name: Build smartmontools-sdk on macOS
 
 on: workflow_dispatch
 
 jobs:
-  build-macos-binaries:
+  build-macos-library:
     runs-on: macos-latest
     steps:
       - name: Install build tools
@@ -13,13 +13,8 @@ jobs:
 
       - uses: actions/checkout@v6
         with:
-          # Done above as the builtin would use a path for Windows git.
           set-safe-directory: false
-          # Provide at least the commit log since last release for 'getversion.sh'.
-          # 'git clone --shallow-since=2025-04-29' would be sufficient but this is
-          # not supported by 'actions/checkout@v6'.
           fetch-depth: 800
-          # Include (future) release tags for 'getversion.sh'
           fetch-tags: true
 
       - name: Set environment
@@ -27,18 +22,21 @@ jobs:
 
       - run: ./autogen.sh
 
-      - name: Build (multiarch)
+      - name: Build library (multiarch)
         run: |
           mkdir build && cd build &&
-          ../configure --with-build-info='(GHA/macOS)' \
-            CFLAGS=-'arch arm64 -arch x86_64' CXXFLAGS='-arch arm64 -arch x86_64' \
+          ../configure --with-build-info='(GHA/macOS)' --with-devel=yes \
+            CFLAGS='-arch arm64 -arch x86_64' CXXFLAGS='-arch arm64 -arch x86_64' \
             SOURCE_DATE_EPOCH=$((SMARTMONTOOLS_GIT_REV_EPOCH + 1)) &&
-          make -j && make check &&
-          make bin-dist bin_distfile="smartmontools-macos-${SMARTMONTOOLS_GIT_VER_FNAME}.tar.gz"
+          make -j -C lib &&
+          mkdir -p lib include &&
+          cp lib/.libs/libsmartmon.a lib/ &&
+          cp -r ../include/smartmon include/ &&
+          tar -czf "../smartmontools-sdk-macos-${SMARTMONTOOLS_GIT_VER_FNAME}.tar.gz" lib include
 
       - name: Upload artifact
         uses: actions/upload-artifact@v7
         with:
-          name: smartmontools-macos
-          path: build/smartmontools-macos-*.tar.gz
+          name: smartmontools-sdk-macos
+          path: smartmontools-sdk-macos-*.tar.gz
           retention-days: 30

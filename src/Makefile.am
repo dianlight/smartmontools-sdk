@@ -992,13 +992,13 @@ libsmartctl_la_SOURCES = \
   ataprint.cpp \
   nvmeprint.cpp \
   scsiprint.cpp \
-  atacmds.cpp \
-  nvmecmds.cpp \
-  scsicmds.cpp \
-  dev_interface.cpp \
-  dev_legacy.cpp \
-  json.cpp \
-  utility.cpp \
+  ../lib/atacmds.cpp \
+  ../lib/nvmecmds.cpp \
+  ../lib/scsicmds.cpp \
+  ../lib/dev_interface.cpp \
+  ../lib/dev_legacy.cpp \
+  ../lib/json.cpp \
+  ../lib/utility.cpp \
   $(DRIVEDB_SOURCES)
 
 libsmartctl_la_CXXFLAGS = $(AM_CXXFLAGS) -DBUILDING_LIBSMARTCTL -fPIC

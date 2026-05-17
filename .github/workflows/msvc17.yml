@@ -1,4 +1,4 @@
-name: Build smartmontools with MSVC17
+name: Build smartmontools-sdk with MSVC17
 
 on:
   workflow_dispatch:
@@ -11,10 +11,6 @@ on:
         description: "Configurations: Debug Debug-static Release Release-static"
         required: false
         default: 'Debug-static Release-static'
-      check-options:
-        description: "'smartctl' options for a quick check"
-        required: false
-        default: '--scan'
 
 jobs:
   configure-src:
@@ -51,23 +47,19 @@ jobs:
 
       - uses: actions/checkout@v6
         with:
-          # Provide at least the commit log since last release for 'getversion.sh'.
-          # 'git clone --shallow-since=2025-04-29' would be sufficient but this is
-          # not supported by 'actions/checkout@v6'.
           fetch-depth: 800
-          # Include (future) release tags for 'getversion.sh'
           fetch-tags: true
 
       - name: Configure source
         run: |
           ./autogen.sh && mkdir build && cd build &&
-          ../configure --build=$(../config.guess) --host=x86_64-w64-mingw32 &&
+          ../configure --build=$(../config.guess) --host=x86_64-w64-mingw32 --with-devel=yes &&
           make config-vc && make distdir && mv smartmontools-*.* smartmontools &&
           cp -av ../src/os_win32/vc17 smartmontools/src/os_win32
 
       - uses: actions/upload-artifact@v7
         with:
-          name: smartmontools-msvc17-src
+          name: smartmontools-sdk-msvc17-src
           path: build/smartmontools/
           retention-days: 30
 
@@ -83,29 +75,22 @@ jobs:
 
       - uses: actions/download-artifact@v8
         with:
-          name: smartmontools-msvc17-src
+          name: smartmontools-sdk-msvc17-src
 
       - run: |
           MSBuild /m /p:Platform=${{matrix.platform}} /p:Configuration=${{matrix.config}} src/os_win32/vc17/smartmontools.sln
 
-      - run: |
-          src/os_win32/vc17/${{matrix.platform}}/${{matrix.config}}/smartctl -V
-
-      - run: |
-          src/os_win32/vc17/${{matrix.platform}}/${{matrix.config}}/smartctl ${{ github.event.inputs.check-options }}
-
       - uses: actions/upload-artifact@v7
         with:
-          name: smartmontools-msvc17-${{matrix.platform}}-${{matrix.config}}-bin
+          name: smartmontools-sdk-msvc17-${{matrix.platform}}-${{matrix.config}}-lib
           path: |
-            src/os_win32/vc17/${{matrix.platform}}/${{matrix.config}}/*.exe
             src/os_win32/vc17/${{matrix.platform}}/${{matrix.config}}/*.lib
           compression-level: 9
           retention-days: 30
 
       - uses: actions/upload-artifact@v7
         with:
-          name: smartmontools-msvc17-${{matrix.platform}}-${{matrix.config}}-pdb
+          name: smartmontools-sdk-msvc17-${{matrix.platform}}-${{matrix.config}}-pdb
           path: src/os_win32/vc17/${{matrix.platform}}/${{matrix.config}}/*.pdb
           compression-level: 9
           retention-days: 30
