@@ -66,7 +66,7 @@ jobs:
           cd smartmontools-${SMARTMONTOOLS_PKG_VER} && mkdir build && cd build &&
           ../configure --with-build-info='(GHA Build)' --with-devel=yes \
             SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH} &&
-          make -j -C lib &&
+          make -C include && make -j -C lib &&
           mkdir -p ${GITHUB_WORKSPACE}/artifacts/lib ${GITHUB_WORKSPACE}/artifacts/include &&
           cp lib/.libs/libsmartmon.a ${GITHUB_WORKSPACE}/artifacts/lib/ &&
           cp -r ../include/smartmon ${GITHUB_WORKSPACE}/artifacts/include/
@@ -100,7 +100,7 @@ jobs:
           cd smartmontools-${SMARTMONTOOLS_PKG_VER} && mkdir build && cd build &&
           setarch i686 ../configure --with-build-info='(GHA Build)' --with-devel=yes \
             CC="gcc -m32" CXX="g++ -m32" SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH} &&
-          make -j -C lib &&
+          make -C include && make -j -C lib &&
           mkdir -p ${GITHUB_WORKSPACE}/artifacts/lib ${GITHUB_WORKSPACE}/artifacts/include &&
           cp lib/.libs/libsmartmon.a ${GITHUB_WORKSPACE}/artifacts/lib/ &&
           cp -r ../include/smartmon ${GITHUB_WORKSPACE}/artifacts/include/
@@ -118,7 +118,7 @@ jobs:
     needs: make-src-tgz
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/dianlight/docker-build:master
+      image: ghcr.io/smartmontools/docker-build:master
     env:
       SOURCE_DATE_EPOCH: ${{ needs.make-src-tgz.outputs.SOURCE_DATE_EPOCH }}
       SMARTMONTOOLS_PKG_VER: ${{ needs.make-src-tgz.outputs.SMARTMONTOOLS_PKG_VER }}
@@ -140,7 +140,7 @@ jobs:
             'CC=o64-clang' 'CXX=o64-clang++' 'CFLAGS=-arch arm64 -arch x86_64' \
             'CXXFLAGS=-arch arm64 -arch x86_64 -stdlib=libc++' \
             SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH} &&
-          make -j -C lib &&
+          make -C include && make -j -C lib &&
           mkdir -p ${GITHUB_WORKSPACE}/artifacts/lib ${GITHUB_WORKSPACE}/artifacts/include &&
           cp lib/.libs/libsmartmon.a ${GITHUB_WORKSPACE}/artifacts/lib/ &&
           cp -r ../include/smartmon ${GITHUB_WORKSPACE}/artifacts/include/
@@ -158,7 +158,7 @@ jobs:
     needs: make-src-tgz
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/dianlight/docker-build:master
+      image: ghcr.io/smartmontools/docker-build:master
     env:
       SOURCE_DATE_EPOCH: ${{ needs.make-src-tgz.outputs.SOURCE_DATE_EPOCH }}
       SMARTMONTOOLS_PKG_VER: ${{ needs.make-src-tgz.outputs.SMARTMONTOOLS_PKG_VER }}
@@ -177,7 +177,7 @@ jobs:
           TARGET="$TARGET -isystem /opt/cross-freebsd-14/usr/include/c++/v1" &&
           ../configure --host=x86_64-pc-freebsd14 --with-build-info='(GHA Build)' --with-devel=yes \
             CC="clang $TARGET" CXX="clang++ $TARGET" SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH} &&
-          make -j -C lib &&
+          make -C include && make -j -C lib &&
           mkdir -p ${GITHUB_WORKSPACE}/artifacts/lib ${GITHUB_WORKSPACE}/artifacts/include &&
           cp lib/.libs/libsmartmon.a ${GITHUB_WORKSPACE}/artifacts/lib/ &&
           cp -r ../include/smartmon ${GITHUB_WORKSPACE}/artifacts/include/
@@ -200,7 +200,7 @@ jobs:
           TARGET="$TARGET -isystem /opt/cross-freebsd-15/usr/include/c++/v1" &&
           ../configure --host=x86_64-pc-freebsd15 --with-build-info='(GHA Build)' --with-devel=yes \
             CC="clang $TARGET" CXX="clang++ $TARGET" SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH} &&
-          make -j -C lib &&
+          make -C include && make -j -C lib &&
           mkdir -p ${GITHUB_WORKSPACE}/artifacts/lib ${GITHUB_WORKSPACE}/artifacts/include &&
           cp lib/.libs/libsmartmon.a ${GITHUB_WORKSPACE}/artifacts/lib/ &&
           cp -r ../include/smartmon ${GITHUB_WORKSPACE}/artifacts/include/
@@ -218,7 +218,7 @@ jobs:
     needs: make-src-tgz
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/dianlight/docker-build:master
+      image: ghcr.io/smartmontools/docker-build:master
     env:
       SOURCE_DATE_EPOCH: ${{ needs.make-src-tgz.outputs.SOURCE_DATE_EPOCH }}
       SMARTMONTOOLS_PKG_VER: ${{ needs.make-src-tgz.outputs.SMARTMONTOOLS_PKG_VER }}
@@ -236,7 +236,7 @@ jobs:
           ../configure --build=$(../config.guess) --host=i686-w64-mingw32 \
             --with-build-info='(GHA Build)' --with-devel=yes \
             SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH} &&
-          make -j -C lib &&
+          make -C include && make -j -C lib &&
           mkdir -p ${GITHUB_WORKSPACE}/artifacts/lib32 ${GITHUB_WORKSPACE}/artifacts/include &&
           cp lib/.libs/libsmartmon.a ${GITHUB_WORKSPACE}/artifacts/lib32/ &&
           cp -r ../include/smartmon ${GITHUB_WORKSPACE}/artifacts/include/ &&
@@ -244,7 +244,7 @@ jobs:
           ../configure --build=$(../config.guess) --host=x86_64-w64-mingw32 \
             --with-build-info='(GHA Build)' --with-devel=yes \
             SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH} &&
-          make -j -C lib &&
+          make -C include && make -j -C lib &&
           mkdir -p ${GITHUB_WORKSPACE}/artifacts/lib64 &&
           cp lib/.libs/libsmartmon.a ${GITHUB_WORKSPACE}/artifacts/lib64/
       - name: Upload library artifacts
@@ -287,7 +287,7 @@ jobs:
           cd smartmontools-${SMARTMONTOOLS_PKG_VER} && mkdir build && cd build &&
           ../configure --build=$(../config.guess) --host=x86_64-pc-cygwin \
             --with-build-info='(GHA Build)' --with-devel=yes SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH} &&
-          make -j -C lib &&
+          make -C include && make -j -C lib &&
           mkdir -p ${GITHUB_WORKSPACE}/artifacts/lib ${GITHUB_WORKSPACE}/artifacts/include &&
           cp lib/.libs/libsmartmon.a ${GITHUB_WORKSPACE}/artifacts/lib/ &&
           cp -r ../include/smartmon ${GITHUB_WORKSPACE}/artifacts/include/

@@ -73,7 +73,7 @@ jobs:
             --with-devel=yes \
             ${{ github.event.inputs.cfg-options }} \
             SOURCE_DATE_EPOCH=$((SMARTMONTOOLS_GIT_REV_EPOCH + 1)) &&
-          make ${{ github.event.inputs.make-options }} -C lib &&
+          make -C include && make ${{ github.event.inputs.make-options }} -C lib &&
           mkdir -p ../../lib ../../include &&
           cp lib/.libs/libsmartmon.* ../../lib/ &&
           cp -r ../include/smartmon ../../include/ &&
@@ -106,7 +106,7 @@ jobs:
             --with-devel=yes \
             ${{ github.event.inputs.cfg-options }} \
             SOURCE_DATE_EPOCH=$((SMARTMONTOOLS_GIT_REV_EPOCH + 1)) &&
-          make ${{ github.event.inputs.make-options }} -C lib &&
+          make -C include && make ${{ github.event.inputs.make-options }} -C lib &&
           mkdir -p ../../lib ../../include &&
           cp lib/.libs/libsmartmon.* ../../lib/ &&
           cp -r ../include/smartmon ../../include/ &&
@@ -143,7 +143,7 @@ jobs:
             SOURCE_DATE_EPOCH=$((SMARTMONTOOLS_GIT_REV_EPOCH + 1)) &&
           ../src/clang-scan-build.sh \
             -f "../../smartmontools-sdk-ubuntu-x86_64-clang-report-${SMARTMONTOOLS_GIT_VER_FNAME}.tar.gz" \
-            make ${{ github.event.inputs.make-options }} -C lib &&
+            make -C include && make ${{ github.event.inputs.make-options }} -C lib &&
           mkdir -p ../../lib ../../include &&
           cp lib/.libs/libsmartmon.* ../../lib/ &&
           cp -r ../include/smartmon ../../include/ &&
@@ -186,7 +186,7 @@ jobs:
             SOURCE_DATE_EPOCH=$((SMARTMONTOOLS_GIT_REV_EPOCH + 1)) &&
           ../src/clang-scan-build.sh \
             -f "../../smartmontools-sdk-ubuntu-arm64-clang-report-${SMARTMONTOOLS_GIT_VER_FNAME}.tar.gz" \
-            make ${{ github.event.inputs.make-options }} -C lib &&
+            make -C include && make ${{ github.event.inputs.make-options }} -C lib &&
           mkdir -p ../../lib ../../include &&
           cp lib/.libs/libsmartmon.* ../../lib/ &&
           cp -r ../include/smartmon ../../include/ &&
@@ -209,7 +209,7 @@ jobs:
     needs: build-source-tarball
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/dianlight/docker-build:master
+      image: ghcr.io/smartmontools/docker-build:master
 
     steps:
       - uses: actions/download-artifact@v8
@@ -232,7 +232,7 @@ jobs:
             CFLAGS="-arch arm64 -arch x86_64" \
             CXXFLAGS="-arch arm64 -arch x86_64 -stdlib=libc++" \
             SOURCE_DATE_EPOCH=$((SMARTMONTOOLS_GIT_REV_EPOCH + 1)) &&
-          make ${{ github.event.inputs.make-options }} -C lib &&
+          make -C include && make ${{ github.event.inputs.make-options }} -C lib &&
           mkdir -p ../../lib ../../include &&
           cp lib/.libs/libsmartmon.* ../../lib/ &&
           cp -r ../include/smartmon ../../include/ &&
@@ -249,7 +249,7 @@ jobs:
     needs: build-source-tarball
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/dianlight/docker-build:master
+      image: ghcr.io/smartmontools/docker-build:master
 
     steps:
       - uses: actions/download-artifact@v8
@@ -270,7 +270,7 @@ jobs:
             ${{ github.event.inputs.cfg-options }} \
             CC="clang $target" CXX="clang++ $target" \
             SOURCE_DATE_EPOCH=$((SMARTMONTOOLS_GIT_REV_EPOCH + 1)) &&
-          make ${{ github.event.inputs.make-options }} -C lib &&
+          make -C include && make ${{ github.event.inputs.make-options }} -C lib &&
           mkdir -p ../../lib ../../include &&
           cp lib/.libs/libsmartmon.* ../../lib/ &&
           cp -r ../include/smartmon ../../include/ &&
@@ -287,7 +287,7 @@ jobs:
     needs: build-source-tarball
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/dianlight/docker-build:master
+      image: ghcr.io/smartmontools/docker-build:master
 
     steps:
       - uses: actions/download-artifact@v8
@@ -308,7 +308,7 @@ jobs:
             ${{ github.event.inputs.cfg-options }} \
             CC="clang $target" CXX="clang++ $target" \
             SOURCE_DATE_EPOCH=$((SMARTMONTOOLS_GIT_REV_EPOCH + 1)) &&
-          make ${{ github.event.inputs.make-options }} -C lib &&
+          make -C include && make ${{ github.event.inputs.make-options }} -C lib &&
           mkdir -p ../../lib ../../include &&
           cp lib/.libs/libsmartmon.* ../../lib/ &&
           cp -r ../include/smartmon ../../include/ &&
@@ -325,7 +325,7 @@ jobs:
     needs: build-source-tarball
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/dianlight/docker-build:master
+      image: ghcr.io/smartmontools/docker-build:master
 
     steps:
       - uses: actions/download-artifact@v8
@@ -343,7 +343,7 @@ jobs:
             --with-devel=yes \
             ${{ github.event.inputs.cfg-options }} \
             SOURCE_DATE_EPOCH=$((SMARTMONTOOLS_GIT_REV_EPOCH + 1)) &&
-          make ${{ github.event.inputs.make-options }} -C lib &&
+          make -C include && make ${{ github.event.inputs.make-options }} -C lib &&
           mkdir -p ../../lib ../../include &&
           cp lib/.libs/libsmartmon.* ../../lib/ &&
           cp -r ../include/smartmon ../../include/ &&
@@ -385,7 +385,7 @@ jobs:
             ${{ github.event.inputs.cfg-options }} \
             LDFLAGS='-L/usr/x86_64-pc-cygwin/sys-root/usr/lib/w32api' \
             SOURCE_DATE_EPOCH=$((SMARTMONTOOLS_GIT_REV_EPOCH + 1)) &&
-          make ${{ github.event.inputs.make-options }} -C lib &&
+          make -C include && make ${{ github.event.inputs.make-options }} -C lib &&
           mkdir -p ../../lib ../../include &&
           cp lib/.libs/libsmartmon.* ../../lib/ &&
           cp -r ../include/smartmon ../../include/ &&

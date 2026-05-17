@@ -40,7 +40,7 @@ jobs:
           mkdir build-gcc && cd build-gcc &&
           ../configure --with-build-info='(GHA/Cygwin)' --with-devel=yes \
             SOURCE_DATE_EPOCH=$((SMARTMONTOOLS_GIT_REV_EPOCH + 1)) &&
-          make -j -C lib &&
+          make -C include && make -j -C lib &&
           mkdir -p lib include &&
           cp lib/.libs/libsmartmon.a lib/ &&
           cp -r ../include/smartmon include/ &&
@@ -61,7 +61,7 @@ jobs:
             SOURCE_DATE_EPOCH=$((SMARTMONTOOLS_GIT_REV_EPOCH + 1)) &&
           ../src/clang-scan-build.sh \
             -f "smartmontools-sdk-cygwin-clang-report-${SMARTMONTOOLS_GIT_VER_FNAME}.tar.gz" \
-            make -j -C lib &&
+            make -C include && make -j -C lib &&
           mkdir -p lib include &&
           cp lib/.libs/libsmartmon.a lib/ &&
           cp -r ../include/smartmon include/ &&
