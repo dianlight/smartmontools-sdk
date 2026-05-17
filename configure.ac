@@ -413,6 +413,13 @@ AC_ARG_ENABLE([fast-lebe],
     fi
   ],[])
 
+AC_ARG_ENABLE([libsmartctl],
+  [AS_HELP_STRING([--enable-libsmartctl], [Build libsmartctl shared library [no]])],
+  [ if test "$enableval" = "yes"; then
+      AM_CONDITIONAL([BUILDING_LIBSMARTCTL], [true])
+    fi
+  ],[AM_CONDITIONAL([BUILDING_LIBSMARTCTL], [false])])
+
 AC_ARG_WITH(os-deps,
   [AS_HELP_STRING([--with-os-deps='os_module.lo ...'], [Specify OS dependent module(s) [guessed]])],
   [ for x in $with_os_deps; do

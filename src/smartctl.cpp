@@ -1,3 +1,5 @@
+#ifndef BUILDING_LIBSMARTCTL
+
 /*
  * smartctl.cpp
  *
@@ -1770,3 +1772,5 @@ int main(int argc, char **argv)
   return status;
 }
 
+
+#endif /* !BUILDING_LIBSMARTCTL */

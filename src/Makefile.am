@@ -979,3 +979,31 @@ install-darwin: install-darwin-cleanup $(pkg_darwin) $(dmg_darwin)
 install-darwin-cleanup: 
 	@rm -rf $(distdir_darwin)
 endif
+
+# ----------------------------------------------------------------
+# libsmartctl shared library target
+# ----------------------------------------------------------------
+if BUILDING_LIBSMARTCTL
+
+lib_LTLIBRARIES = libsmartctl.la
+
+libsmartctl_la_SOURCES = \
+  libsmartctl.cpp \
+  ataprint.cpp \
+  nvmeprint.cpp \
+  scsiprint.cpp \
+  atacmds.cpp \
+  nvmecmds.cpp \
+  scsicmds.cpp \
+  dev_interface.cpp \
+  dev_legacy.cpp \
+  json.cpp \
+  utility.cpp \
+  $(DRIVEDB_SOURCES)
+
+libsmartctl_la_CXXFLAGS = $(AM_CXXFLAGS) -DBUILDING_LIBSMARTCTL -fPIC
+libsmartctl_la_LDFLAGS  = -shared -avoid-version \
+                           -export-symbols-regex '^smartctl_' \
+                           $(LDFLAGS)
+
+endif  # BUILDING_LIBSMARTCTL
