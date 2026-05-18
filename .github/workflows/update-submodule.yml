@@ -83,9 +83,9 @@ jobs:
               --title "Update smartmontools to v${VERSION}" \
               --body "Automated update of smartmontools submodule to release tag \`${TAG}\` (v${VERSION}).
 
-This PR was created automatically by the submodule update checker workflow.
+              This PR was created automatically by the submodule update checker workflow.
 
-Once merged, the build workflow will produce library artifacts and create a release tagged \`v${VERSION}\`." \
-              --base main \
-              --head "${BRANCH}"
+              Once merged, the build workflow will produce library artifacts and create a release tagged \`v${VERSION}\`." \
+                            --base main \
+                            --head "${BRANCH}"
           fi
