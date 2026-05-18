@@ -1,16 +1,47 @@
 ## About Smartmontools SDK
 
-This is a fork of [smartmontools/smartmontools](https://github.com/smartmontools/smartmontools)
-with **libsmartctl** shared library support, maintained for the
-[smartmontools-go](https://github.com/dianlight/smartmontools-go) project.
+This repository produces prebuilt static libraries (`libsmartmon.a`) from
+[smartmontools/smartmontools](https://github.com/smartmontools/smartmontools)
+for multiple platforms and architectures.
 
-### What's different
+The upstream smartmontools source is included as a **git submodule** — not
+forked. An SDK overlay (`include/`, `lib/`, `src/`) adds the library build
+targets and the `libsmartctl` C API wrapper used by
+[smartmontools-go](https://github.com/dianlight/smartmontools-go).
 
-- **`libsmartctl.so` / `libsmartctl.dylib`** — shared library target via `--enable-libsmartctl`
-- **C API** (`src/libsmartctl.h`) — stable interface for FFI consumers (purego, CGO)
-- **Weekly upstream sync** — automated rebase via `sync-upstream.yml`
+### Supported Platforms
 
-### Building the shared library
+| OS | Architecture |
+|----|-------------|
+| Linux | amd64, aarch64 |
+| macOS (Darwin) | amd64, aarch64 |
+| Windows | amd64, aarch64 |
+
+### How It Works
+
+1. **Submodule** — `smartmontools/` points to a specific upstream release tag.
+2. **Build workflow** — triggered on PR merge or manual dispatch, compiles
+   `libsmartmon.a` for all 6 platform/arch targets.
+3. **Release** — artifacts are published as GitHub releases tagged with the
+   upstream version (e.g. `v8.0`).
+4. **Automated updates** — a daily workflow checks for new upstream release
+   tags and opens a PR to update the submodule.
+
+### Building locally
+
+```bash
+git clone --recurse-submodules https://github.com/dianlight/smartmontools-sdk.git
+cd smartmontools-sdk
+./autogen.sh
+mkdir build && cd build
+../configure --with-devel=yes
+make -C include
+make -j$(nproc) -C lib
+```
+
+The static library will be at `build/lib/.libs/libsmartmon.a`.
+
+### Building the shared library (libsmartctl)
 
 ```bash
 ./autogen.sh
@@ -18,9 +49,6 @@ with **libsmartctl** shared library support, maintained for the
   CFLAGS="-fPIC" CXXFLAGS="-fPIC -DBUILDING_LIBSMARTCTL"
 make -j$(nproc)
 ```
-
-The library will be at `src/.libs/libsmartctl.so` (Linux) or
-`src/.libs/libsmartctl.dylib` (macOS).
 
 ### C API
 
@@ -40,24 +68,17 @@ See `src/libsmartctl.h` for the full API. Key functions:
 ---
 
 ## About Smartmontools
-The smartmontools package contains two utility programs (`smartctl` and `smartd`) 
-to control and monitor storage systems using the **Self-Monitoring, Analysis and 
-Reporting Technology System** (SMART) built into most modern ATA/SATA, SCSI/SAS and NVMe disks. 
-In many cases, these utilities will provide advanced warning of disk degradation and failure.
 
-Smartmontools was originally derived from the Linux [smartsuite package](https://sourceforge.net/projects/smartsuite/) and supports ATA/SATA, SCSI/SAS, and NVMe disks and also SCSI/SAS tape devices.
-It should run on any modern Linux, FreeBSD, NetBSD, OpenBSD, Darwin (macOS), Solaris, Windows, Cygwin, OS/2, eComStation, or QNX system.
-Smartmontools can also be run from one of many different Live CDs/DVDs.
+The smartmontools package contains two utility programs (`smartctl` and `smartd`)
+to control and monitor storage systems using the **Self-Monitoring, Analysis and
+Reporting Technology System** (SMART) built into most modern ATA/SATA, SCSI/SAS and NVMe disks.
 
-## Important links
-- [Project homepage](https://www.smartmontools.org/)
-- [GitHub repository](https://github.com/smartmontools/smartmontools)
-- [CI builds](https://github.com/smartmontools/smartmontools-builds/releases)
-- [Project Releases](https://github.com/smartmontools/smartmontools/releases)
+## Links
 
-
-## Code Signing
-This program uses free code signing provided by [SignPath.io](https://signpath.io) and a free code signing certificate by the [SignPath Foundation](https://signpath.org)
+- [Smartmontools homepage](https://www.smartmontools.org/)
+- [Upstream repository](https://github.com/smartmontools/smartmontools)
+- [Smartmontools releases](https://github.com/smartmontools/smartmontools/releases)
 
 ## License
-Smartmontools uses [GNU GPL Version 2](https://www.gnu.org/licenses/gpl-2.0.html#SEC1) license. 
+
+Smartmontools uses [GNU GPL Version 2](https://www.gnu.org/licenses/gpl-2.0.html#SEC1) license.

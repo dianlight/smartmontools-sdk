@@ -1,356 +1,191 @@
-name: Build smartmontools-sdk (non-release)
+name: Build and Release
 
 on:
-  push:
-    branches: [ "main" ]
   pull_request:
-    branches: [ "main" ]
+    branches: [main]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
-  make-src-tgz:
+  prepare:
     runs-on: ubuntu-latest
-    name: Create smartmontools-sdk dist
     outputs:
-      SOURCE_DATE_EPOCH: ${{ steps.set-env.outputs.SMARTMONTOOLS_GIT_REV_EPOCH }}
-      SMARTMONTOOLS_PKG_VER: ${{ steps.set-env.outputs.SMARTMONTOOLS_PKG_VER }}
-      SMARTMONTOOLS_GIT_VER_FNAME: ${{ steps.set-env.outputs.SMARTMONTOOLS_GIT_VER_FNAME }}
-      artficact-id: ${{ steps.artifact-upload-step.outputs.artifact-id }}
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+          fetch-depth: 0
+
+      - name: Determine version from submodule
+        id: version
+        run: |
+          cd smartmontools
+          TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          if [ -z "$TAG" ]; then
+            TAG=$(git rev-parse --short HEAD)
+          fi
+          VERSION="${TAG#RELEASE_}"
+          VERSION="${VERSION//_/.}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Detected version: ${VERSION}"
+
+  build:
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: linux-amd64
+            host: x86_64-linux-gnu
+            cc: gcc
+            cxx: g++
+            cflags: ""
+            cxxflags: ""
+            deps: ""
+            container: ""
+
+          - os: ubuntu-latest
+            target: linux-aarch64
+            host: aarch64-linux-gnu
+            cc: aarch64-linux-gnu-gcc
+            cxx: aarch64-linux-gnu-g++
+            cflags: ""
+            cxxflags: ""
+            deps: gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+            container: ""
+
+          - os: ubuntu-latest
+            target: darwin-amd64
+            host: x86_64-apple-darwin20.4
+            cc: o64-clang
+            cxx: o64-clang++
+            cflags: "-arch x86_64"
+            cxxflags: "-arch x86_64 -stdlib=libc++"
+            deps: ""
+            container: ghcr.io/smartmontools/docker-build:master
+
+          - os: ubuntu-latest
+            target: darwin-aarch64
+            host: x86_64-apple-darwin20.4
+            cc: o64-clang
+            cxx: o64-clang++
+            cflags: "-arch arm64"
+            cxxflags: "-arch arm64 -stdlib=libc++"
+            deps: ""
+            container: ghcr.io/smartmontools/docker-build:master
+
+          - os: ubuntu-latest
+            target: windows-amd64
+            host: x86_64-w64-mingw32
+            cc: x86_64-w64-mingw32-gcc
+            cxx: x86_64-w64-mingw32-g++
+            cflags: ""
+            cxxflags: ""
+            deps: gcc-mingw-w64-x86-64 g++-mingw-w64-x86-64
+            container: ""
+
+          - os: ubuntu-latest
+            target: windows-aarch64
+            host: aarch64-w64-mingw32
+            cc: ""
+            cxx: ""
+            cflags: ""
+            cxxflags: ""
+            deps: ""
+            container: ghcr.io/smartmontools/docker-build:master
+
+    runs-on: ${{ matrix.os }}
+    container: ${{ matrix.container || null }}
+    env:
+      VERSION: ${{ needs.prepare.outputs.version }}
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
         with:
-          fetch-depth: 800
-          fetch-tags: true
-      - name: Setting environment variables
-        id: set-env
-        run: |
-          src/getversion.sh -g >> $GITHUB_ENV
-          cat $GITHUB_ENV | tee $GITHUB_OUTPUT
+          submodules: true
+          fetch-depth: 0
 
-      - name: Creating src.tar.gz
+      - name: Install dependencies
+        if: matrix.deps != ''
         run: |
-          ./autogen.sh --force &&
-          mkdir build && cd build &&
-          ../configure SOURCE_DATE_EPOCH=${SMARTMONTOOLS_GIT_REV_EPOCH} --with-devel=yes &&
-          make dist && tar -tvzf "smartmontools-${SMARTMONTOOLS_PKG_VER}.tar.gz" &&
-          mkdir artifacts &&
-          echo ${SMARTMONTOOLS_GIT_REV_EPOCH} > artifacts/SOURCE_DATE_EPOCH &&
-          touch -d @${SMARTMONTOOLS_GIT_REV_EPOCH} artifacts/SOURCE_DATE_EPOCH &&
-          mv smartmontools-${SMARTMONTOOLS_PKG_VER}.tar.gz artifacts/smartmontools-sdk-${SMARTMONTOOLS_GIT_VER_FNAME}.tar.gz
+          sudo apt-get update
+          sudo apt-get install -y ${{ matrix.deps }}
+
+      - name: Setup Darwin cross-compiler PATH
+        if: contains(matrix.target, 'darwin')
+        run: |
+          echo "/usr/osxcross/bin" >> $GITHUB_PATH
+          echo "LD_LIBRARY_PATH=/usr/osxcross/lib" >> $GITHUB_ENV
+
+      - name: Build library
+        run: |
+          ./autogen.sh --force
+          mkdir -p build && cd build
+
+          CONFIGURE_ARGS="--with-devel=yes --with-build-info='(GHA Build)'"
+
+          if [ "${{ matrix.host }}" != "x86_64-linux-gnu" ]; then
+            CONFIGURE_ARGS="${CONFIGURE_ARGS} --build=$(../config.guess) --host=${{ matrix.host }}"
+          fi
+
+          CC="${{ matrix.cc }}"
+          CXX="${{ matrix.cxx }}"
+          CFLAGS="${{ matrix.cflags }}"
+          CXXFLAGS="${{ matrix.cxxflags }}"
+
+          eval ../configure ${CONFIGURE_ARGS} \
+            ${CC:+CC=\"$CC\"} \
+            ${CXX:+CXX=\"$CXX\"} \
+            ${CFLAGS:+CFLAGS=\"$CFLAGS\"} \
+            ${CXXFLAGS:+CXXFLAGS=\"$CXXFLAGS\"}
+
+          make -C include
+          make -j$(nproc) -C lib
+
+      - name: Package artifacts
+        run: |
+          mkdir -p artifacts/lib artifacts/include
+          cp build/lib/.libs/libsmartmon.a artifacts/lib/
+          cp -r include/smartmon artifacts/include/
 
       - name: Upload artifacts
-        id: artifact-upload-step
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         with:
-          name: artifacts
-          path: build/artifacts/
-          retention-days: 1
+          name: libsmartmon-${{ matrix.target }}
+          path: artifacts/
+          retention-days: 5
 
-  compile-linux-static-x86_64:
-    name: Creating static x86_64 linux library
-    needs: make-src-tgz
+  release:
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
+    needs: [prepare, build]
     runs-on: ubuntu-latest
     env:
-      SOURCE_DATE_EPOCH: ${{ needs.make-src-tgz.outputs.SOURCE_DATE_EPOCH }}
-      SMARTMONTOOLS_PKG_VER: ${{ needs.make-src-tgz.outputs.SMARTMONTOOLS_PKG_VER }}
-      SMARTMONTOOLS_GIT_VER_FNAME: ${{ needs.make-src-tgz.outputs.SMARTMONTOOLS_GIT_VER_FNAME }}
+      VERSION: ${{ needs.prepare.outputs.version }}
     steps:
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@v4
         with:
-          artifact-ids: ${{ needs.make-src-tgz.outputs.artficact-id }}
           path: artifacts
-      - name: build
-        run: |
-          tar -xvf artifacts/smartmontools-sdk-${SMARTMONTOOLS_GIT_VER_FNAME}.tar.gz &&
-          cd smartmontools-${SMARTMONTOOLS_PKG_VER} && mkdir build && cd build &&
-          ../configure --with-build-info='(GHA Build)' --with-devel=yes \
-            SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH} &&
-          make -C include && make -j -C lib &&
-          mkdir -p ${GITHUB_WORKSPACE}/artifacts/lib ${GITHUB_WORKSPACE}/artifacts/include &&
-          cp lib/.libs/libsmartmon.a ${GITHUB_WORKSPACE}/artifacts/lib/ &&
-          cp -r ../include/smartmon ${GITHUB_WORKSPACE}/artifacts/include/
-      - name: Upload library artifacts
-        uses: actions/upload-artifact@v7
-        with:
-          name: libsmartmon-linux-x86_64-static
-          path: |
-            artifacts/lib/libsmartmon.a
-            artifacts/include/smartmon/
-          retention-days: 1
 
-  compile-linux-static-i386:
-    name: Creating static i386 linux library
-    needs: make-src-tgz
-    runs-on: ubuntu-latest
-    env:
-      SOURCE_DATE_EPOCH: ${{ needs.make-src-tgz.outputs.SOURCE_DATE_EPOCH }}
-      SMARTMONTOOLS_PKG_VER: ${{ needs.make-src-tgz.outputs.SMARTMONTOOLS_PKG_VER }}
-      SMARTMONTOOLS_GIT_VER_FNAME: ${{ needs.make-src-tgz.outputs.SMARTMONTOOLS_GIT_VER_FNAME }}
-    steps:
-      - uses: actions/download-artifact@v8
-        with:
-          artifact-ids: ${{ needs.make-src-tgz.outputs.artficact-id }}
-          path: artifacts
-      - name: install m32 dependencies
-        run: sudo apt-get update && sudo apt-get install gcc-multilib g++-multilib
-      - name: build
+      - name: Package release archives
         run: |
-          tar -xvf artifacts/smartmontools-sdk-${SMARTMONTOOLS_GIT_VER_FNAME}.tar.gz &&
-          cd smartmontools-${SMARTMONTOOLS_PKG_VER} && mkdir build && cd build &&
-          setarch i686 ../configure --with-build-info='(GHA Build)' --with-devel=yes \
-            CC="gcc -m32" CXX="g++ -m32" SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH} &&
-          make -C include && make -j -C lib &&
-          mkdir -p ${GITHUB_WORKSPACE}/artifacts/lib ${GITHUB_WORKSPACE}/artifacts/include &&
-          cp lib/.libs/libsmartmon.a ${GITHUB_WORKSPACE}/artifacts/lib/ &&
-          cp -r ../include/smartmon ${GITHUB_WORKSPACE}/artifacts/include/
-      - name: Upload library artifacts
-        uses: actions/upload-artifact@v7
-        with:
-          name: libsmartmon-linux-i386-static
-          path: |
-            artifacts/lib/libsmartmon.a
-            artifacts/include/smartmon/
-          retention-days: 1
+          mkdir -p release
+          for dir in artifacts/libsmartmon-*; do
+            target=$(basename "$dir" | sed 's/libsmartmon-//')
+            tar -czf "release/libsmartmon-${VERSION}-${target}.tar.gz" -C "$dir" .
+          done
 
-  compile-darwin:
-    name: Creating Darwin library
-    needs: make-src-tgz
-    runs-on: ubuntu-latest
-    container:
-      image: ghcr.io/smartmontools/docker-build:master
-    env:
-      SOURCE_DATE_EPOCH: ${{ needs.make-src-tgz.outputs.SOURCE_DATE_EPOCH }}
-      SMARTMONTOOLS_PKG_VER: ${{ needs.make-src-tgz.outputs.SMARTMONTOOLS_PKG_VER }}
-      SMARTMONTOOLS_GIT_VER_FNAME: ${{ needs.make-src-tgz.outputs.SMARTMONTOOLS_GIT_VER_FNAME }}
-    steps:
-      - uses: actions/download-artifact@v8
-        with:
-          artifact-ids: ${{ needs.make-src-tgz.outputs.artficact-id }}
-          path: artifacts
-      - name: build
-        run: |
-          export PATH=/usr/osxcross/bin/:$PATH &&
-          export LD_LIBRARY_PATH=/usr/osxcross/lib &&
-          tar -xvf artifacts/smartmontools-sdk-${SMARTMONTOOLS_GIT_VER_FNAME}.tar.gz &&
-          cd smartmontools-${SMARTMONTOOLS_PKG_VER} &&
-          mkdir build && cd build &&
-          ../configure --build=$(../config.guess) --host=x86_64-apple-darwin20.4 \
-            --with-build-info='(GHA Build)' --with-devel=yes \
-            'CC=o64-clang' 'CXX=o64-clang++' 'CFLAGS=-arch arm64 -arch x86_64' \
-            'CXXFLAGS=-arch arm64 -arch x86_64 -stdlib=libc++' \
-            SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH} &&
-          make -C include && make -j -C lib &&
-          mkdir -p ${GITHUB_WORKSPACE}/artifacts/lib ${GITHUB_WORKSPACE}/artifacts/include &&
-          cp lib/.libs/libsmartmon.a ${GITHUB_WORKSPACE}/artifacts/lib/ &&
-          cp -r ../include/smartmon ${GITHUB_WORKSPACE}/artifacts/include/
-      - name: Upload library artifacts
-        uses: actions/upload-artifact@v7
-        with:
-          name: libsmartmon-darwin
-          path: |
-            artifacts/lib/libsmartmon.a
-            artifacts/include/smartmon/
-          retention-days: 1
-
-  compile-freebsd:
-    name: Creating FreeBSD libraries
-    needs: make-src-tgz
-    runs-on: ubuntu-latest
-    container:
-      image: ghcr.io/smartmontools/docker-build:master
-    env:
-      SOURCE_DATE_EPOCH: ${{ needs.make-src-tgz.outputs.SOURCE_DATE_EPOCH }}
-      SMARTMONTOOLS_PKG_VER: ${{ needs.make-src-tgz.outputs.SMARTMONTOOLS_PKG_VER }}
-      SMARTMONTOOLS_GIT_VER_FNAME: ${{ needs.make-src-tgz.outputs.SMARTMONTOOLS_GIT_VER_FNAME }}
-    steps:
-      - uses: actions/download-artifact@v8
-        with:
-          artifact-ids: ${{ needs.make-src-tgz.outputs.artficact-id }}
-          path: artifacts
-      - name: FreeBSD 14 build
-        run: |
-          tar -xvf artifacts/smartmontools-sdk-${SMARTMONTOOLS_GIT_VER_FNAME}.tar.gz &&
-          cd smartmontools-${SMARTMONTOOLS_PKG_VER} &&
-          mkdir build && cd build &&
-          export TARGET="-target x86_64-unknown-freebsd14 --sysroot=/opt/cross-freebsd-14/" &&
-          TARGET="$TARGET -isystem /opt/cross-freebsd-14/usr/include/c++/v1" &&
-          ../configure --host=x86_64-pc-freebsd14 --with-build-info='(GHA Build)' --with-devel=yes \
-            CC="clang $TARGET" CXX="clang++ $TARGET" SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH} &&
-          make -C include && make -j -C lib &&
-          mkdir -p ${GITHUB_WORKSPACE}/artifacts/lib ${GITHUB_WORKSPACE}/artifacts/include &&
-          cp lib/.libs/libsmartmon.a ${GITHUB_WORKSPACE}/artifacts/lib/ &&
-          cp -r ../include/smartmon ${GITHUB_WORKSPACE}/artifacts/include/
-      - name: Upload library artifacts
-        uses: actions/upload-artifact@v7
-        with:
-          name: libsmartmon-freebsd-14
-          path: |
-            artifacts/lib/libsmartmon.a
-            artifacts/include/smartmon/
-          retention-days: 1
-      - name: cleanup
-        run: rm -rf smartmontools-${SMARTMONTOOLS_PKG_VER}
-      - name: FreeBSD 15 build
-        run: |
-          tar -xvf artifacts/smartmontools-sdk-${SMARTMONTOOLS_GIT_VER_FNAME}.tar.gz &&
-          cd smartmontools-${SMARTMONTOOLS_PKG_VER} &&
-          mkdir build && cd build &&
-          export TARGET="-target x86_64-unknown-freebsd15 --sysroot=/opt/cross-freebsd-15/" &&
-          TARGET="$TARGET -isystem /opt/cross-freebsd-15/usr/include/c++/v1" &&
-          ../configure --host=x86_64-pc-freebsd15 --with-build-info='(GHA Build)' --with-devel=yes \
-            CC="clang $TARGET" CXX="clang++ $TARGET" SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH} &&
-          make -C include && make -j -C lib &&
-          mkdir -p ${GITHUB_WORKSPACE}/artifacts/lib ${GITHUB_WORKSPACE}/artifacts/include &&
-          cp lib/.libs/libsmartmon.a ${GITHUB_WORKSPACE}/artifacts/lib/ &&
-          cp -r ../include/smartmon ${GITHUB_WORKSPACE}/artifacts/include/
-      - name: Upload library artifacts
-        uses: actions/upload-artifact@v7
-        with:
-          name: libsmartmon-freebsd-15
-          path: |
-            artifacts/lib/libsmartmon.a
-            artifacts/include/smartmon/
-          retention-days: 1
-
-  compile-windows:
-    name: Creating Windows library
-    needs: make-src-tgz
-    runs-on: ubuntu-latest
-    container:
-      image: ghcr.io/smartmontools/docker-build:master
-    env:
-      SOURCE_DATE_EPOCH: ${{ needs.make-src-tgz.outputs.SOURCE_DATE_EPOCH }}
-      SMARTMONTOOLS_PKG_VER: ${{ needs.make-src-tgz.outputs.SMARTMONTOOLS_PKG_VER }}
-      SMARTMONTOOLS_GIT_VER_FNAME: ${{ needs.make-src-tgz.outputs.SMARTMONTOOLS_GIT_VER_FNAME }}
-    steps:
-      - uses: actions/download-artifact@v8
-        with:
-          artifact-ids: ${{ needs.make-src-tgz.outputs.artficact-id }}
-          path: artifacts
-      - name: Windows build
-        run: |
-          tar -xvf artifacts/smartmontools-sdk-${SMARTMONTOOLS_GIT_VER_FNAME}.tar.gz &&
-          cd smartmontools-${SMARTMONTOOLS_PKG_VER} &&
-          mkdir build && cd build &&
-          ../configure --build=$(../config.guess) --host=i686-w64-mingw32 \
-            --with-build-info='(GHA Build)' --with-devel=yes \
-            SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH} &&
-          make -C include && make -j -C lib &&
-          mkdir -p ${GITHUB_WORKSPACE}/artifacts/lib32 ${GITHUB_WORKSPACE}/artifacts/include &&
-          cp lib/.libs/libsmartmon.a ${GITHUB_WORKSPACE}/artifacts/lib32/ &&
-          cp -r ../include/smartmon ${GITHUB_WORKSPACE}/artifacts/include/ &&
-          cd .. && mkdir build64 && cd build64 &&
-          ../configure --build=$(../config.guess) --host=x86_64-w64-mingw32 \
-            --with-build-info='(GHA Build)' --with-devel=yes \
-            SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH} &&
-          make -C include && make -j -C lib &&
-          mkdir -p ${GITHUB_WORKSPACE}/artifacts/lib64 &&
-          cp lib/.libs/libsmartmon.a ${GITHUB_WORKSPACE}/artifacts/lib64/
-      - name: Upload library artifacts
-        uses: actions/upload-artifact@v7
-        with:
-          name: libsmartmon-windows
-          path: |
-            artifacts/lib32/libsmartmon.a
-            artifacts/lib64/libsmartmon.a
-            artifacts/include/smartmon/
-          retention-days: 1
-
-  compile-cygwin:
-    name: Creating Cygwin library
-    needs: make-src-tgz
-    runs-on: ubuntu-latest
-    container: fedora:latest
-    env:
-      SOURCE_DATE_EPOCH: ${{ needs.make-src-tgz.outputs.SOURCE_DATE_EPOCH }}
-      SMARTMONTOOLS_PKG_VER: ${{ needs.make-src-tgz.outputs.SMARTMONTOOLS_PKG_VER }}
-      SMARTMONTOOLS_GIT_VER_FNAME: ${{ needs.make-src-tgz.outputs.SMARTMONTOOLS_GIT_VER_FNAME }}
-    steps:
-      - name: Install build tools
-        run: |
-          dnf install -y make
-      - name: Enable 'dnf copr'
-        run: |
-          dnf install -y dnf-plugins-core
-      - name: Install cross-cygwin toolchain
-        run: |
-          dnf copr enable -y yselkowitz/cygwin
-          dnf install -y cygwin64-gcc-c++
-      - uses: actions/download-artifact@v8
-        with:
-          artifact-ids: ${{ needs.make-src-tgz.outputs.artficact-id }}
-          path: artifacts
-      - name: Cygwin build
-        run: |
-          tar -xvf artifacts/smartmontools-sdk-${SMARTMONTOOLS_GIT_VER_FNAME}.tar.gz &&
-          cd smartmontools-${SMARTMONTOOLS_PKG_VER} && mkdir build && cd build &&
-          ../configure --build=$(../config.guess) --host=x86_64-pc-cygwin \
-            --with-build-info='(GHA Build)' --with-devel=yes SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH} &&
-          make -C include && make -j -C lib &&
-          mkdir -p ${GITHUB_WORKSPACE}/artifacts/lib ${GITHUB_WORKSPACE}/artifacts/include &&
-          cp lib/.libs/libsmartmon.a ${GITHUB_WORKSPACE}/artifacts/lib/ &&
-          cp -r ../include/smartmon ${GITHUB_WORKSPACE}/artifacts/include/
-      - name: Upload library artifacts
-        uses: actions/upload-artifact@v7
-        with:
-          name: libsmartmon-cygwin
-          path: |
-            artifacts/lib/libsmartmon.a
-            artifacts/include/smartmon/
-          retention-days: 1
-
-  publish-artifacts:
-    if: ${{ github.repository == 'dianlight/smartmontools-sdk' && github.ref == 'refs/heads/main' }}
-    env:
-      SOURCE_DATE_EPOCH: ${{ needs.make-src-tgz.outputs.SOURCE_DATE_EPOCH }}
-      SMARTMONTOOLS_PKG_VER: ${{ needs.make-src-tgz.outputs.SMARTMONTOOLS_PKG_VER }}
-      SMARTMONTOOLS_GIT_VER_FNAME: ${{ needs.make-src-tgz.outputs.SMARTMONTOOLS_GIT_VER_FNAME }}
-    name: publish-artifacts
-    needs:
-      - make-src-tgz
-      - compile-linux-static-x86_64
-      - compile-linux-static-i386
-      - compile-darwin
-      - compile-freebsd
-      - compile-windows
-      - compile-cygwin
-    runs-on: ubuntu-latest
-    environment:
-      name: mainbranch
-      url: https://github.com/dianlight/smartmontools-sdk-releases
-    steps:
-      - uses: actions/download-artifact@v8
-        with:
-          merge-multiple: true
-          path: artifacts
-      - uses: actions/create-github-app-token@v3
-        id: app-token
-        with:
-          client-id: ${{ secrets.APP_ID }}
-          private-key: ${{ secrets.PRIVATE_KEY }}
-          owner: dianlight
-          repositories: smartmontools-sdk-releases
-      - name: gh create delete (cleanup)
+      - name: Create or update release
         env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release delete "smartmontools-sdk-${SMARTMONTOOLS_GIT_VER_FNAME}" --repo dianlight/smartmontools-sdk-releases \
-            --yes --cleanup-tag || true
-      - name: gh create release
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-        run: |
-          gh release create "smartmontools-sdk-${SMARTMONTOOLS_GIT_VER_FNAME}" \
-            artifacts/* \
-            --repo dianlight/smartmontools-sdk-releases \
-            --notes "Smartmontools SDK CI build: [smartmontools-sdk-${SMARTMONTOOLS_GIT_VER_FNAME}](https://github.com/dianlight/smartmontools-sdk/tree/${GITHUB_SHA})" \
-            --prerelease
-      - name: Clean old builds
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-        run: |
-          gh -R dianlight/smartmontools-sdk-releases release list \
-            -L 100 --json tagName -q '.[50:][]|.tagName' | \
-            xargs -n1 --no-run-if-empty \
-            gh -R dianlight/smartmontools-sdk-releases release delete --cleanup-tag --yes
+          gh release delete "v${VERSION}" --repo "${{ github.repository }}" --yes --cleanup-tag 2>/dev/null || true
+          gh release create "v${VERSION}" \
+            release/* \
+            --repo "${{ github.repository }}" \
+            --title "smartmontools-sdk v${VERSION}" \
+            --notes "Library build from smartmontools ${VERSION}" \
+            --latest

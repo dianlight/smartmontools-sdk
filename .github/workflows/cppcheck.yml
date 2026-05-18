@@ -8,13 +8,10 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y cppcheck
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
         with:
-          # Provide at least the commit log since last release for 'getversion.sh'.
-          # 'git clone --shallow-since=2025-04-29' would be sufficient but this is
-          # not supported by 'actions/checkout@v6'.
+          submodules: true
           fetch-depth: 800
-          # Include (future) release tags for 'getversion.sh'
           fetch-tags: true
       - name: Run cppcheck
         run: |
