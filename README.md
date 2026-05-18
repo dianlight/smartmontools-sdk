@@ -5,8 +5,8 @@ This repository produces prebuilt static libraries (`libsmartmon.a`) from
 for multiple platforms and architectures.
 
 The upstream smartmontools source is included as a **git submodule** — not
-forked. An SDK overlay (`include/`, `lib/`, `src/`) adds the library build
-targets and the `libsmartctl` C API wrapper used by
+forked. An SDK overlay (`include/`, `lib/`) wraps the library build targets
+used by consumers such as
 [smartmontools-go](https://github.com/dianlight/smartmontools-go).
 
 ### Supported Platforms
@@ -15,19 +15,36 @@ targets and the `libsmartctl` C API wrapper used by
 |----|-------------|
 | Linux | amd64, aarch64 |
 | macOS (Darwin) | amd64, aarch64 |
-| Windows | amd64, aarch64 |
+| Windows | amd64 |
 
 ### How It Works
 
 1. **Submodule** — `smartmontools/` points to a specific upstream release tag.
 2. **Build workflow** — triggered on PR merge or manual dispatch, compiles
-   `libsmartmon.a` for all 6 platform/arch targets.
+   `libsmartmon.a` for all 5 platform/arch targets.
 3. **Release** — artifacts are published as GitHub releases tagged with the
-   upstream version (e.g. `v8.0`).
+   upstream version (e.g. `v8.0`). Each release contains one `.tar.gz` per
+   target with `lib/libsmartmon.a` and `include/smartmon/*.h`.
 4. **Automated updates** — a daily workflow checks for new upstream release
    tags and opens a PR to update the submodule.
 
+### Using a prebuilt release
+
+Download the appropriate archive from the
+[releases page](https://github.com/dianlight/smartmontools-sdk/releases),
+then add the library and headers to your build:
+
+```bash
+tar -xzf libsmartmon-<version>-<target>.tar.gz -C /usr/local
+# lib/libsmartmon.a → /usr/local/lib/libsmartmon.a
+# include/smartmon/ → /usr/local/include/smartmon/
+```
+
+Link against it with `-lsmartmon` (and `-lstdc++` for C++ symbol resolution).
+
 ### Building locally
+
+Requires: autoconf, automake, libtool, a C++11 compiler.
 
 ```bash
 git clone --recurse-submodules https://github.com/dianlight/smartmontools-sdk.git
@@ -36,48 +53,41 @@ cd smartmontools-sdk
 mkdir build && cd build
 ../configure --with-devel=yes
 make -C include
-make -j$(nproc) -C lib
+make -j$(nproc) -C lib libsmartmon.la
 ```
 
-The static library will be at `build/lib/.libs/libsmartmon.a`.
+The static library will be at `build/lib/.libs/libsmartmon.a` and the public
+headers under `include/smartmon/`.
 
-### Building the shared library (libsmartctl)
+### Public headers
 
-```bash
-./autogen.sh
-./configure --enable-shared --disable-static --enable-libsmartctl \
-  CFLAGS="-fPIC" CXXFLAGS="-fPIC -DBUILDING_LIBSMARTCTL"
-make -j$(nproc)
-```
+All public headers are installed under `include/smartmon/`:
 
-### C API
-
-See `src/libsmartctl.h` for the full API. Key functions:
-
-| Function | Description |
-|----------|-------------|
-| `smartctl_init()` | Create execution context |
-| `smartctl_scan_devices()` | Enumerate storage devices (JSON) |
-| `smartctl_get_smart_data()` | Get full SMART data (JSON) |
-| `smartctl_check_health()` | Overall health assessment |
-| `smartctl_run_selftest()` | Start a self-test |
-| `smartctl_enable_smart()` / `smartctl_disable_smart()` | Toggle SMART |
-| `smartctl_abort_selftest()` | Abort running test |
-| `smartctl_destroy()` | Free context |
+| Header | Description |
+|--------|-------------|
+| `dev_interface.h` | Core device abstraction (open, identify, passthrough) |
+| `atacmds.h` | ATA/SATA command set |
+| `nvmecmds.h` | NVMe command set |
+| `scsicmds.h` (via lib) | SCSI/SAS command set |
+| `json.h` | JSON output builder |
+| `utility.h` | Logging, string helpers |
+| `smartmon_defs.h` | Common macros and type definitions |
 
 ---
 
 ## About Smartmontools
 
-The smartmontools package contains two utility programs (`smartctl` and `smartd`)
-to control and monitor storage systems using the **Self-Monitoring, Analysis and
-Reporting Technology System** (SMART) built into most modern ATA/SATA, SCSI/SAS and NVMe disks.
+The smartmontools package implements the **Self-Monitoring, Analysis and
+Reporting Technology** (SMART) protocol for ATA/SATA, SCSI/SAS and NVMe
+storage devices. This SDK exposes the core library (`libsmartmon`) so that
+other programs can query device health without spawning a subprocess.
 
 ## Links
 
 - [Smartmontools homepage](https://www.smartmontools.org/)
 - [Upstream repository](https://github.com/smartmontools/smartmontools)
 - [Smartmontools releases](https://github.com/smartmontools/smartmontools/releases)
+- [smartmontools-go](https://github.com/dianlight/smartmontools-go) — Go bindings
 
 ## License
 

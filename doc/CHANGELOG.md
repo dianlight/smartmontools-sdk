@@ -1,3 +1,29 @@
+# Smartmontools SDK Changelog
+
+## SDK changes
+
+### 2025-05-18
+
+- Removed `windows-aarch64` build target (missing `windres` in the
+  `aarch64-w64-mingw32` cross-toolchain; the target was incomplete).
+- Fixed macOS cross-compilation: build `libsmartmon.la` directly instead of
+  the full `lib` target to avoid a cross-arch mismatch caused by the
+  `lib/examples` subdirectory not inheriting `-arch` flags.
+- Fixed CI builds inside Docker containers: set `SMARTMONTOOLS_TEST_BUILD=1`
+  to bypass the `getversion.sh` git-log requirement.
+- Updated CI actions to Node.js 24-compatible versions:
+  `actions/checkout@v6`, `actions/upload-artifact@v7`,
+  `actions/download-artifact@v8`.
+- Removed unused files from the repository: `smartctl`/`smartd` CLI sources
+  and all associated print files, man pages, init/service files, Windows
+  installer scripts, Visual Studio project files (`vc17/`), old signing keys,
+  old changelogs, dev tooling (`Doxyfile`, `do_release`, `clang-scan-build.sh`),
+  `libsmartctl.cpp/h`, and `src/getopt/`.
+- Simplified `src/Makefile.am` to a minimal file that provides only the
+  `cppcheck` and `shellcheck` make targets.
+
+---
+
 # smartmontools Changelog
 
 ## smartmontools 8.0 (not yet released)
