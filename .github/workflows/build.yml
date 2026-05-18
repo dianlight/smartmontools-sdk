@@ -14,7 +14,7 @@ jobs:
     outputs:
       version: ${{ steps.version.outputs.version }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           submodules: true
           fetch-depth: 0
@@ -88,23 +88,14 @@ jobs:
             deps: gcc-mingw-w64-x86-64 g++-mingw-w64-x86-64
             container: ""
 
-          - os: ubuntu-latest
-            target: windows-aarch64
-            host: aarch64-w64-mingw32
-            cc: ""
-            cxx: ""
-            cflags: ""
-            cxxflags: ""
-            deps: ""
-            container: ghcr.io/smartmontools/docker-build:master
-
     runs-on: ${{ matrix.os }}
     container: ${{ matrix.container || null }}
     env:
       VERSION: ${{ needs.prepare.outputs.version }}
+      SMARTMONTOOLS_TEST_BUILD: "1"
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           submodules: true
           fetch-depth: 0
@@ -153,7 +144,7 @@ jobs:
           cp -r include/smartmon artifacts/include/
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: libsmartmon-${{ matrix.target }}
           path: artifacts/
@@ -166,7 +157,7 @@ jobs:
     env:
       VERSION: ${{ needs.prepare.outputs.version }}
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: artifacts
 
