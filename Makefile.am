@@ -31,9 +31,6 @@ examplescripts_SCRIPTS = \
 EXTRA_DIST = \
         .editorconfig \
         autogen.sh \
-        doc/old/ChangeLog-6.0-7.0.txt \
-        doc/old/ChangeLog-5.0-6.0.txt \
-        doc/old/ChangeLog-7.0-7.5.txt \
         drivedb/drivedb.h \
         m4/pkg.m4 \
         $(doc_DATA) \

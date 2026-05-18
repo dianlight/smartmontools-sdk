@@ -21,7 +21,7 @@ fi
 
 AC_DEFINE_UNQUOTED(SMARTMONTOOLS_CONFIGURE_ARGS, "$ac_configure_args",             [smartmontools Configure Arguments])
 
-AC_CONFIG_SRCDIR([src/smartctl.cpp])
+AC_CONFIG_SRCDIR([lib/dev_interface.cpp])
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_MACRO_DIR([m4])
 
