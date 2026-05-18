@@ -135,7 +135,7 @@ jobs:
             ${CXXFLAGS:+CXXFLAGS=\"$CXXFLAGS\"}
 
           make -C include
-          make -j$(nproc) -C lib
+          make -j$(nproc) -C lib libsmartmon.la
 
       - name: Package artifacts
         run: |
