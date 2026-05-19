@@ -288,17 +288,6 @@ case "${host}" in
 esac
 AC_SUBST(initdfile)
 
-examplescriptsdir='${docdir}/examplescripts'
-# TODO: Remove after smartmontools 8.1
-AC_ARG_WITH(exampledir, [AS_HELP_STRING([--with-exampledir=DIR], [(deprecated)])],
-  [examplescriptsdir=$withval])
-
-AC_ARG_WITH(smartd-scripts,
-  [AS_HELP_STRING([--with-smartd-scripts=DIR],
-    [Location of smartd example scripts [DOCDIR/examplescripts]])],
-  [examplescriptsdir=$withval])
-AC_SUBST([examplescriptsdir])
-
 drivedbdir='${datadir}/${PACKAGE}'
 drivedbinstdir=
 AC_ARG_WITH(drivedbinstdir,
@@ -1041,7 +1030,6 @@ info=`
       fi
       echo "lib examples src dir:   \`eval eval eval echo ${develsrcdir:-[[disabled]]}\`"
       echo "lib examples bin dir:   \`eval eval eval echo ${develbindir:-[[disabled]]}\`"
-      echo "smartd examples dir:    \`eval eval eval echo $examplescriptsdir\`"
       if test -n "$drivedbdir"; then
         if test "$drivedbinstdir" != "$drivedbdir"; then
           echo "installed drivedb file: \`eval eval eval echo $drivedbinstdir\`/drivedb.h"

@@ -12,31 +12,12 @@ doc_DATA = \
         doc/INSTALL \
         README.md
 
-docolddir = $(docdir)/old
-docold_DATA = \
-        doc/old/NEWS-5.0-7.5.txt
-
-examplescripts_DATA = \
-        doc/examplescripts/README
-examplescripts_SCRIPTS = \
-        doc/examplescripts/Example1 \
-        doc/examplescripts/Example2 \
-        doc/examplescripts/Example3 \
-        doc/examplescripts/Example4 \
-        doc/examplescripts/Example5 \
-        doc/examplescripts/Example6 \
-        doc/examplescripts/Example7 \
-        doc/examplescripts/Example8
-
 EXTRA_DIST = \
         .editorconfig \
         autogen.sh \
         drivedb/drivedb.h \
         m4/pkg.m4 \
-        $(doc_DATA) \
-        $(docold_DATA) \
-        $(examplescripts_DATA) \
-        $(examplescripts_SCRIPTS)
+        $(doc_DATA)
 
 CLEANFILES = \
         smartmontools-$(PACKAGE_VERSION).tar \
