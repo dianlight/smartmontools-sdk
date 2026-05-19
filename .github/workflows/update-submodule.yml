@@ -152,21 +152,21 @@ jobs:
           if [ -n "$NEW_DRIVES" ]; then
             DRIVES_SECTION="### New/updated drive entries
 
-${NEW_DRIVES}"
-          else
-            DRIVES_SECTION="_No new drive families detected (attribute or firmware updates only)._"
-          fi
-
-          cat > /tmp/pr_body.md << EOF
-Automated update of \`drivedb/drivedb.h\` from upstream [\`${UPSTREAM_BRANCH}\`](https://github.com/smartmontools/smartmontools/tree/${UPSTREAM_BRANCH}).
-
-${DRIVES_SECTION}
-
----
-_This PR was created automatically by the submodule update checker workflow._
-EOF
-
-          EXISTING_PR=$(gh pr list --head "${PR_BRANCH}" --state open --json number -q '.[0].number')
+          ${NEW_DRIVES}"
+                    else
+                      DRIVES_SECTION="_No new drive families detected (attribute or firmware updates only)._"
+                    fi
+          
+                    cat > /tmp/pr_body.md << EOF
+          Automated update of \`drivedb/drivedb.h\` from upstream [\`${UPSTREAM_BRANCH}\`](https://github.com/smartmontools/smartmontools/tree/${UPSTREAM_BRANCH}).
+          
+          ${DRIVES_SECTION}
+          
+          ---
+          _This PR was created automatically by the submodule update checker workflow._
+          EOF
+          
+                    EXISTING_PR=$(gh pr list --head "${PR_BRANCH}" --state open --json number -q '.[0].number')
           if [ -n "$EXISTING_PR" ]; then
             echo "Refreshing existing PR #${EXISTING_PR}"
             gh pr edit "${EXISTING_PR}" --body-file /tmp/pr_body.md
