@@ -61,9 +61,6 @@ INC_SRC_TARGETS += config-vc
 LIB_SRC_TARGETS += dist-win32 distdir-win32 install-win32 installer-win32
 endif
 
-if OS_DARWIN
-LIB_SRC_TARGETS += install-darwin install-darwin-cleanup
-endif
 
 # Avoid automake warning: '.PHONY was already defined in condition ...'
 phony = bin-dist $(SRC_TARGETS) $(INC_SRC_TARGETS) $(LIB_SRC_TARGETS)

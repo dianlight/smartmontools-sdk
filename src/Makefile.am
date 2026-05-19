@@ -8,15 +8,7 @@ ECHO_V_GEN = @$(AM_V_P) || echo '  GEN      $@'; ! $(AM_V_P) || echo
 
 EXTRA_DIST = \
         cppcheck.sh \
-        getversion.sh \
-        os_win32/daemon_win32.cpp \
-        os_win32/daemon_win32.h \
-        os_win32/default.manifest \
-        os_win32/runcmd.c \
-        os_win32/syslog.h \
-        os_win32/syslog_win32.cpp \
-        os_win32/syslogevt.mc \
-        os_win32/versioninfo.rc.in
+        getversion.sh
 
 CLEANFILES = cppcheck.txt shellcheck.txt
 

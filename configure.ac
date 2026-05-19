@@ -635,25 +635,6 @@ The option '--with-mingw-aslr' is no longer supported.  Recent versions
 of the MinGW-w64 toolchain usually enable ASLR by default.
 ])])
 
-os_win32_manifest=
-case "$host" in
-  *-*-mingw*)
-    # Newer MinGW may add a default manifest
-    AC_MSG_CHECKING([whether $CXX adds an application manifest])
-    cc_adds_manifest=no
-    AC_LINK_IFELSE([AC_LANG_PROGRAM()], [
-        if "$WINDRES" -O rc conftest.exe 2>/dev/null | grep '^1.*RT_MANIFEST' >/dev/null 2>&1; then
-          cc_adds_manifest=incomplete
-          # Manifest must provide a Win 10 compatibility ID
-          if "$WINDRES" -O rc conftest.exe 2>/dev/null | grep '{8e0f7a12-bfb3-4fe8-b9a5-48fd50a15a9a}' >/dev/null 2>&1; then
-            cc_adds_manifest=yes
-          fi
-        fi],
-      [AC_MSG_ERROR([test compile failed])])
-    AC_MSG_RESULT([$cc_adds_manifest])
-    test "$cc_adds_manifest" = "yes" || os_win32_manifest='os_win32/default.manifest'
-    ;;
-esac
 
 AC_ARG_WITH(cxx11-regex,
   [AS_HELP_STRING([--with-cxx11-regex@<:@=yes|no@:>@],
@@ -782,7 +763,6 @@ AC_SUBST([os_hostname])
 AC_SUBST([os_dnsdomainname])
 AC_SUBST([os_nisdomainname])
 AC_SUBST([os_man_filter])
-AC_SUBST([os_win32_manifest])
 
 # drivedb.h update branch
 DRIVEDB_BRANCH=$smartmontools_drivedb_version
@@ -990,7 +970,6 @@ info=`
 
   case "$host_os" in
     mingw*)
-      echo "application manifest:   ${os_win32_manifest:-[[built-in]]}"
       echo "resource compiler:      $WINDRES"
       echo "message compiler:       ${WINDMC:-[[missing]]}"
       echo "NSIS compiler:          ${MAKENSIS:-[[missing]]}"
