@@ -166,7 +166,9 @@ jobs:
           _This PR was created automatically by the submodule update checker workflow._
           EOF
           
-                    EXISTING_PR=$(gh pr list --head "${PR_BRANCH}" --state open --json number -q '.[0].number')
+                    # Use '// empty' so that jq outputs nothing (not the string "null")
+                    # when no open PR exists, preventing a false-positive match.
+                    EXISTING_PR=$(gh pr list --head "${PR_BRANCH}" --state open --json number -q '.[0].number // empty')
           if [ -n "$EXISTING_PR" ]; then
             echo "Refreshing existing PR #${EXISTING_PR}"
             gh pr edit "${EXISTING_PR}" --body-file /tmp/pr_body.md
@@ -177,4 +179,3 @@ jobs:
               --base main \
               --head "${PR_BRANCH}"
           fi
-
