@@ -115,7 +115,7 @@ jobs:
         run: |
           UPSTREAM_BRANCH="${{ steps.branch.outputs.drivedb_branch }}"
           git fetch --depth=1 https://github.com/smartmontools/smartmontools.git "${UPSTREAM_BRANCH}"
-          git show FETCH_HEAD:drivedb.h > /tmp/upstream_drivedb.h
+          git show FETCH_HEAD:smartmontools/drivedb.h > /tmp/upstream_drivedb.h
           if diff -q drivedb/drivedb.h /tmp/upstream_drivedb.h > /dev/null; then
             echo "has_update=false" >> "$GITHUB_OUTPUT"
             echo "drivedb.h is already up to date"
