@@ -133,12 +133,24 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y ${{ matrix.deps }}
 
-      - name: Setup musl toolchain
+      - name: Cache musl toolchain
         if: matrix.musl_toolchain != ''
+        id: cache-toolchain
+        uses: actions/cache@v4
+        with:
+          path: toolchain/${{ matrix.musl_toolchain }}
+          key: musl-toolchain-${{ runner.os }}-${{ matrix.musl_toolchain }}-v1
+
+      - name: Add musl toolchain to PATH
+        if: matrix.musl_toolchain != ''
+        run: echo "$GITHUB_WORKSPACE/toolchain/${{ matrix.musl_toolchain }}/bin" >> $GITHUB_PATH
+
+      - name: Download musl toolchain if not cached
+        if: steps.cache-toolchain.outputs.cache-hit != 'true' && matrix.musl_toolchain != ''
         run: |
-          curl -sSL "https://musl.cc/${{ matrix.musl_toolchain }}.tgz" \
-            | sudo tar -xz -C /usr/local
-          echo "/usr/local/${{ matrix.musl_toolchain }}/bin" >> $GITHUB_PATH
+          mkdir -p toolchain
+          curl -sSL --retry 5 "https://musl.cc/${{ matrix.musl_toolchain }}.tgz" \
+            | tar -xz -C toolchain
 
       - name: Setup Darwin cross-compiler PATH
         if: contains(matrix.target, 'darwin')
