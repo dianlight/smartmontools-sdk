@@ -47,6 +47,7 @@ jobs:
             cxxflags: ""
             deps: ""
             container: ""
+            musl_toolchain: ""
 
           - os: ubuntu-latest
             target: linux-aarch64
@@ -57,6 +58,29 @@ jobs:
             cxxflags: ""
             deps: gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
             container: ""
+            musl_toolchain: ""
+
+          - os: ubuntu-latest
+            target: linux-amd64-musl
+            host: x86_64-linux-musl
+            cc: x86_64-linux-musl-gcc
+            cxx: x86_64-linux-musl-g++
+            cflags: ""
+            cxxflags: ""
+            deps: ""
+            container: ""
+            musl_toolchain: x86_64-linux-musl-cross
+
+          - os: ubuntu-latest
+            target: linux-aarch64-musl
+            host: aarch64-linux-musl
+            cc: aarch64-linux-musl-gcc
+            cxx: aarch64-linux-musl-g++
+            cflags: ""
+            cxxflags: ""
+            deps: ""
+            container: ""
+            musl_toolchain: aarch64-linux-musl-cross
 
           - os: ubuntu-latest
             target: darwin-amd64
@@ -67,6 +91,7 @@ jobs:
             cxxflags: "-arch x86_64 -stdlib=libc++"
             deps: ""
             container: ghcr.io/smartmontools/docker-build:master
+            musl_toolchain: ""
 
           - os: ubuntu-latest
             target: darwin-aarch64
@@ -77,6 +102,7 @@ jobs:
             cxxflags: "-arch arm64 -stdlib=libc++"
             deps: ""
             container: ghcr.io/smartmontools/docker-build:master
+            musl_toolchain: ""
 
           - os: ubuntu-latest
             target: windows-amd64
@@ -87,6 +113,7 @@ jobs:
             cxxflags: ""
             deps: gcc-mingw-w64-x86-64 g++-mingw-w64-x86-64
             container: ""
+            musl_toolchain: ""
 
     runs-on: ${{ matrix.os }}
     container: ${{ matrix.container || null }}
@@ -105,6 +132,13 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y ${{ matrix.deps }}
+
+      - name: Setup musl toolchain
+        if: matrix.musl_toolchain != ''
+        run: |
+          curl -sSL "https://musl.cc/${{ matrix.musl_toolchain }}.tgz" \
+            | sudo tar -xz -C /usr/local
+          echo "/usr/local/${{ matrix.musl_toolchain }}/bin" >> $GITHUB_PATH
 
       - name: Setup Darwin cross-compiler PATH
         if: contains(matrix.target, 'darwin')
