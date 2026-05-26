@@ -47,7 +47,7 @@ jobs:
             cxxflags: ""
             deps: ""
             container: ""
-            musl_toolchain: ""
+            zig_version: ""
 
           - os: ubuntu-latest
             target: linux-aarch64
@@ -58,29 +58,29 @@ jobs:
             cxxflags: ""
             deps: gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
             container: ""
-            musl_toolchain: ""
+            zig_version: ""
 
           - os: ubuntu-latest
             target: linux-amd64-musl
             host: x86_64-linux-musl
-            cc: x86_64-linux-musl-gcc
-            cxx: x86_64-linux-musl-g++
+            cc: zig cc -target x86_64-linux-musl
+            cxx: zig c++ -target x86_64-linux-musl
             cflags: ""
             cxxflags: ""
             deps: ""
             container: ""
-            musl_toolchain: x86_64-linux-musl-cross
+            zig_version: 0.13.0
 
           - os: ubuntu-latest
             target: linux-aarch64-musl
             host: aarch64-linux-musl
-            cc: aarch64-linux-musl-gcc
-            cxx: aarch64-linux-musl-g++
+            cc: zig cc -target aarch64-linux-musl
+            cxx: zig c++ -target aarch64-linux-musl
             cflags: ""
             cxxflags: ""
             deps: ""
             container: ""
-            musl_toolchain: aarch64-linux-musl-cross
+            zig_version: 0.13.0
 
           - os: ubuntu-latest
             target: darwin-amd64
@@ -91,7 +91,7 @@ jobs:
             cxxflags: "-arch x86_64 -stdlib=libc++"
             deps: ""
             container: ghcr.io/smartmontools/docker-build:master
-            musl_toolchain: ""
+            zig_version: ""
 
           - os: ubuntu-latest
             target: darwin-aarch64
@@ -102,7 +102,7 @@ jobs:
             cxxflags: "-arch arm64 -stdlib=libc++"
             deps: ""
             container: ghcr.io/smartmontools/docker-build:master
-            musl_toolchain: ""
+            zig_version: ""
 
           - os: ubuntu-latest
             target: windows-amd64
@@ -113,7 +113,7 @@ jobs:
             cxxflags: ""
             deps: gcc-mingw-w64-x86-64 g++-mingw-w64-x86-64
             container: ""
-            musl_toolchain: ""
+            zig_version: ""
 
     runs-on: ${{ matrix.os }}
     container: ${{ matrix.container || null }}
@@ -133,24 +133,11 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y ${{ matrix.deps }}
 
-      - name: Cache musl toolchain
-        if: matrix.musl_toolchain != ''
-        id: cache-toolchain
-        uses: actions/cache@v4
+      - name: Setup Zig toolchain
+        if: matrix.zig_version != ''
+        uses: mlugg/setup-zig@v2
         with:
-          path: toolchain/${{ matrix.musl_toolchain }}
-          key: musl-toolchain-${{ runner.os }}-${{ matrix.musl_toolchain }}-v1
-
-      - name: Add musl toolchain to PATH
-        if: matrix.musl_toolchain != ''
-        run: echo "$GITHUB_WORKSPACE/toolchain/${{ matrix.musl_toolchain }}/bin" >> $GITHUB_PATH
-
-      - name: Download musl toolchain if not cached
-        if: steps.cache-toolchain.outputs.cache-hit != 'true' && matrix.musl_toolchain != ''
-        run: |
-          mkdir -p toolchain
-          curl -sSL --retry 5 "https://musl.cc/${{ matrix.musl_toolchain }}.tgz" \
-            | tar -xz -C toolchain
+          version: ${{ matrix.zig_version }}
 
       - name: Setup Darwin cross-compiler PATH
         if: contains(matrix.target, 'darwin')
