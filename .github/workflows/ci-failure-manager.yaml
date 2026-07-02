@@ -2,6 +2,9 @@ name: CI Failure Issue Manager
 
 on:
   workflow_run:
+    workflows:
+      - Build and Release
+      - Check Submodule Updates
     types:
       - completed
 
