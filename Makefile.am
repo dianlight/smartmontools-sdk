@@ -47,6 +47,21 @@ MAINTAINERCLEANFILES = \
 SUBDIRS = include lib src
 
 #
+# Sync local drivedb/drivedb.h to smartmontools submodule before building
+#
+.PHONY: sync-drivedb
+sync-drivedb:
+	@if [ -f $(srcdir)/drivedb/drivedb.h ]; then \
+	  echo "Syncing local drivedb/drivedb.h to smartmontools/drivedb.h"; \
+	  cp $(srcdir)/drivedb/drivedb.h $(srcdir)/smartmontools/drivedb.h; \
+	else \
+	  echo "Warning: $(srcdir)/drivedb/drivedb.h not found"; \
+	fi
+
+# Ensure drivedb is synced before building subdirectories
+$(SUBDIRS): sync-drivedb
+
+#
 # Additional targets in '*/Makefile.am'
 #
 SRC_TARGETS = cppcheck htmlman pdfman shellcheck

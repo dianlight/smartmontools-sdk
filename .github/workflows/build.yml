@@ -3,6 +3,15 @@ name: Build and Release
 on:
   pull_request:
     branches: [main]
+    paths:
+      - '.gitmodules'  
+      - 'drivedb/drivedb.h'
+      - '.github/workflows/build.yml'
+      - 'Makefile.am'
+      - 'configure.ac'
+      - 'lib/**'
+      - 'include/**'
+      - 'src/**'
   workflow_dispatch:
 
 permissions:
@@ -144,6 +153,15 @@ jobs:
         run: |
           echo "/usr/osxcross/bin" >> $GITHUB_PATH
           echo "LD_LIBRARY_PATH=/usr/osxcross/lib" >> $GITHUB_ENV
+
+      - name: Sync local drivedb.h to smartmontools submodule
+        run: |
+          if [ -f drivedb/drivedb.h ]; then
+            echo "Syncing drivedb/drivedb.h to smartmontools/drivedb.h"
+            cp drivedb/drivedb.h smartmontools/drivedb.h
+          else
+            echo "Warning: drivedb/drivedb.h not found"
+          fi          
 
       - name: Build library
         run: |
