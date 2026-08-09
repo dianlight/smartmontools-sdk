@@ -188,6 +188,43 @@ jobs:
           make -C include
           make -j$(nproc) -C lib libsmartmon.la
 
+      - name: Build libsmartmon_go wrapper (purego lib backend)
+        if: matrix.target != 'windows-amd64'
+        env:
+          SMARTMONTOOLS_GO_REF: v0.4.1
+        run: |
+          set -euo pipefail
+
+          # Fetch the C wrapper sources pinned to the smartmontools-go release
+          # that SRAT vendors. The smartmontools-go-version file lets consumers
+          # assert their vendored ref matches the wrapper ABI.
+          mkdir -p csrc
+          for f in smartmon_c_api.cpp smartmon_c_api.h; do
+            curl -fsSL "https://raw.githubusercontent.com/dianlight/smartmontools-go/${SMARTMONTOOLS_GO_REF}/backends/lib/csrc/${f}" \
+              -o "csrc/${f}"
+          done
+
+          CXX="${{ matrix.cxx }}"
+          CXXFLAGS="${{ matrix.cxxflags }}"
+          COMMON="-std=c++17 -fPIC -O2 -I${GITHUB_WORKSPACE}/include -I${GITHUB_WORKSPACE}/build/include"
+
+          mkdir -p artifacts/lib
+
+          if [[ "${{ matrix.target }}" == darwin-* ]]; then
+            OUT="artifacts/lib/libsmartmon_go.dylib"
+            eval "${CXX} ${COMMON} ${CXXFLAGS} -dynamiclib -o ${OUT} csrc/smartmon_c_api.cpp -L${GITHUB_WORKSPACE}/build/lib/.libs -lsmartmon -lm -framework CoreFoundation -framework IOKit"
+          elif [[ "${{ matrix.cxx }}" == zig* ]]; then
+            # zig c++ links its bundled libc++ automatically; no -lstdc++.
+            OUT="artifacts/lib/libsmartmon_go.so"
+            eval "${CXX} ${COMMON} ${CXXFLAGS} -shared -o ${OUT} csrc/smartmon_c_api.cpp -L${GITHUB_WORKSPACE}/build/lib/.libs -lsmartmon -lm"
+          else
+            OUT="artifacts/lib/libsmartmon_go.so"
+            eval "${CXX} ${COMMON} ${CXXFLAGS} -shared -o ${OUT} csrc/smartmon_c_api.cpp -L${GITHUB_WORKSPACE}/build/lib/.libs -lsmartmon -lstdc++ -lm"
+          fi
+
+          echo "${SMARTMONTOOLS_GO_REF}" > artifacts/lib/smartmontools-go-version
+          ls -la artifacts/lib/
+
       - name: Package artifacts
         run: |
           mkdir -p artifacts/lib artifacts/include
