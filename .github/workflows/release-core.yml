@@ -142,6 +142,7 @@ jobs:
 
       - name: Build library
         working-directory: native
+        shell: bash
         run: |
           ./autogen.sh --force
           mkdir -p build && cd build
