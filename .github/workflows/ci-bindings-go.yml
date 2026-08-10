@@ -52,8 +52,6 @@ jobs:
 
   integration:
     runs-on: ubuntu-latest
-    env:
-      SMARTMONTOOLS_TEST_BUILD: "1"
     steps:
       - uses: actions/checkout@v7
         with:
@@ -63,21 +61,5 @@ jobs:
         with:
           working_directory: bindings/go
 
-      - name: Build native core (linux-amd64)
-        working-directory: native
-        run: |
-          ./autogen.sh --force
-          mkdir -p build && cd build
-          ../configure --with-devel=yes --with-pic
-          make -C include
-          make -j"$(nproc)" -C lib libsmartmon.la
-
-      - name: Build C ABI wrapper
-        run: scripts/build-wrapper.sh --target linux-amd64
-
-      - name: Run lib-backend integration tests
-        working-directory: bindings/go
-        env:
-          SMARTMON_INTEGRATION: "1"
-          SMARTMON_LIB_PATH: ${{ github.workspace }}/packaging/artifacts/lib/libsmartmon_go.so
-        run: go test -failfast ./backends/lib/...
+      - name: Run native<->bindings/go integration contract test
+        run: integration/core-go/run.sh
