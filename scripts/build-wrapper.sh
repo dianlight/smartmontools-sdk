@@ -97,11 +97,15 @@ SHARED_FLAG="-shared"
 case "${TARGET}" in
   linux-amd64)
     CXX_ARR=(g++)
-    LINK_FLAGS=(-lstdc++ -lm)
+    # -pthread: smartmon_c_api.cpp uses std::mutex/std::call_once, which pull
+    # in libpthread symbols. glibc >= 2.34 merged libpthread into libc, making
+    # this a no-op there, but older glibc cross-sysroots still need it linked
+    # explicitly or the resulting .so fails to resolve pthread_* at load time.
+    LINK_FLAGS=(-lstdc++ -lm -pthread)
     ;;
   linux-aarch64)
     CXX_ARR=(aarch64-linux-gnu-g++)
-    LINK_FLAGS=(-lstdc++ -lm)
+    LINK_FLAGS=(-lstdc++ -lm -pthread)
     ;;
   linux-amd64-musl)
     CXX_ARR=(zig c++ -target x86_64-linux-musl)

@@ -1,8 +1,14 @@
 // smartmon_c_api.h – extern "C" bridge between CGO and libsmartmon.
 //
-// All functions are thread-safe through an internal global mutex.
-// The smart_interface singleton is initialised once per process; call
-// smartmon_init() before any other function.
+// Functions that operate on a device or the interface singleton
+// (smartmon_scan_devices, smartmon_get_smart_data, smartmon_check_health,
+// smartmon_enable_smart, smartmon_disable_smart, smartmon_run_selftest,
+// smartmon_abort_selftest) are serialised through an internal global mutex,
+// because the underlying smartmontools library is not thread-safe.
+// smartmon_abi_version, smartmon_init, smartmon_cleanup, smartmon_last_error
+// and smartmon_free_string do not take that mutex; smartmon_init() is itself
+// safe to call concurrently (std::call_once-guarded) and must be called
+// before any of the mutex-guarded functions above.
 #pragma once
 
 #ifdef __cplusplus

@@ -4,8 +4,10 @@
 // operations. The smart_interface global singleton is initialised once per
 // process (std::call_once). All public functions are serialised through a
 // global std::mutex because the smartmontools library is not thread-safe.
-// Thread-local storage is used for error strings so callers on any goroutine
-// can read the last error without races.
+// The last-error string is a mutex-protected global, not thread_local:
+// Go's purego backend calls run on goroutines that are not pinned to OS
+// threads, so a thread_local set by one call could be read back from a
+// different OS thread on the next call.
 
 #include "smartmon_c_api.h"
 
@@ -29,7 +31,20 @@ using namespace smartmon;
 // Global / thread-local state
 // ---------------------------------------------------------------------------
 
-static thread_local std::string tl_last_error;
+// Guards g_last_error only. Kept separate from g_mutex (which serialises SDK
+// calls) so that error reporting never nests locks with the SDK call path.
+static std::mutex g_error_mutex;
+static std::string g_last_error;
+
+// set_last_error/get_last_error replace a thread_local error string: Go's
+// purego backend is not pinned to OS threads, so a goroutine can set an
+// error on one OS thread and read it back on another. A thread_local would
+// silently read back empty/stale state in that case; a mutex-protected
+// global is visible to whichever OS thread reads it next.
+static void set_last_error(const std::string & msg) {
+    std::lock_guard<std::mutex> lk(g_error_mutex);
+    g_last_error = msg;
+}
 
 static std::once_flag g_init_flag;
 static bool           g_init_ok    = false;
@@ -91,16 +106,28 @@ static const char * safe_type(const char * t) {
     return (t && *t) ? t : "";
 }
 
-// open_dev opens a device with optional type hint; writes tl_last_error on failure.
+// open_dev opens a device with optional type hint; writes the last-error
+// string on failure. Guards device and smi() explicitly: smi() is null if
+// smartmon_init() was never called (or failed), and a caller across the C
+// ABI boundary could pass a NULL device pointer.
 static std::unique_ptr<smart_device> open_dev(const char * device, const char * dev_type) {
-    smart_device * raw = smi()->get_smart_device(device, safe_type(dev_type));
+    if (!device) {
+        set_last_error("NULL device pointer");
+        return nullptr;
+    }
+    smart_interface * iface = smi();
+    if (!iface) {
+        set_last_error("smart_interface not initialised; call smartmon_init() first");
+        return nullptr;
+    }
+    smart_device * raw = iface->get_smart_device(device, safe_type(dev_type));
     if (!raw) {
-        tl_last_error = smi()->get_errmsg();
+        set_last_error(iface->get_errmsg());
         return nullptr;
     }
     std::unique_ptr<smart_device> dev(raw);
     if (!smart_device::autodetect_open(dev)) {
-        tl_last_error = dev ? dev->get_errmsg() : smi()->get_errmsg();
+        set_last_error(dev ? dev->get_errmsg() : iface->get_errmsg());
         return nullptr;
     }
     return dev;
@@ -116,20 +143,33 @@ static std::string build_ata_json(ata_device * ata, const char * devname, const 
     ata_smart_thresholds_pvt thresh = {};
     ata_vendor_attr_defs     defs;
 
-    if (ata_read_identity(ata, &id, /*fix_swapped_id=*/true) < 0) {
-        tl_last_error = ata->get_errmsg();
+    // fix_swapped_id=false: ata_format_id_string() (used below by
+    // fmt_ata_str) already performs the byte-pair swap on read. Passing
+    // true here as well double-swaps model/serial/firmware back to their
+    // original on-wire order — see native/lib/examples/lsdisk.cpp, the
+    // SDK's own reference program, which pairs fix_swapped_id=false with
+    // ata_format_id_string() the same way.
+    if (ata_read_identity(ata, &id, /*fix_swapped_id=*/false) < 0) {
+        set_last_error(ata->get_errmsg());
         return "";
     }
     if (ataReadSmartValues(ata, &sv) < 0) {
-        tl_last_error = std::string("failed to read SMART values for device ") + devname + ": " + ata->get_errmsg();
+        set_last_error(std::string("failed to read SMART values for device ") + devname + ": " + ata->get_errmsg());
         return "";
     }
-    if (ataReadSmartThresholds(ata, &thresh) < 0) {
-        tl_last_error = std::string("failed to read SMART thresholds for device ") + devname + ": " + ata->get_errmsg();
-        return "";
-    }
+    // Some SAT/USB bridges and similar devices don't support the READ SMART
+    // THRESHOLDS command at all; smartctl itself tolerates this and falls
+    // back to zero-initialized thresholds (ata_get_attr_state() treats a
+    // zero threshold entry as "no threshold data"), so a failure here must
+    // not abort the whole read the way a genuine SMART VALUES failure does.
+    if (ataReadSmartThresholds(ata, &thresh) < 0)
+        thresh = ata_smart_thresholds_pvt();
 
     int  smart_status = ataSmartStatus2(ata);
+    if (smart_status < 0) {
+        set_last_error(std::string("failed to read SMART status for device ") + devname + ": " + ata->get_errmsg());
+        return "";
+    }
     int  rotation     = ata_get_rotation_rate(&id);
     bool avail        = (id.command_set_1 & 0x0001) != 0;
     bool enabled      = (id.cfs_enable_1  & 0x0001) != 0;
@@ -241,11 +281,11 @@ static std::string build_nvme_json(nvme_device * nvme, const char * devname) {
     nvme_smart_log smart_log = {};
 
     if (!nvme_read_id_ctrl(nvme, id_ctrl)) {
-        tl_last_error = nvme->get_errmsg();
+        set_last_error(nvme->get_errmsg());
         return "";
     }
     if (!nvme_read_smart_log(nvme, 0xFFFFFFFF, smart_log)) {
-        tl_last_error = nvme->get_errmsg();
+        set_last_error(nvme->get_errmsg());
         return "";
     }
 
@@ -339,7 +379,7 @@ int smartmon_init(void) {
         }
     });
     if (!g_init_ok)
-        tl_last_error = g_init_error;
+        set_last_error(g_init_error);
     return g_init_ok ? 0 : -1;
 }
 
@@ -348,7 +388,17 @@ void smartmon_cleanup(void) {
 }
 
 const char * smartmon_last_error(void) {
-    return tl_last_error.c_str();
+    // The returned pointer must stay valid until the next call on this
+    // thread, so the global error is copied into a thread-local buffer
+    // rather than returned directly — g_last_error itself must NOT be
+    // thread_local, since the call that set it may run on a different OS
+    // thread than the one reading it back (Go goroutines migrate threads).
+    static thread_local std::string tl_error_copy;
+    {
+        std::lock_guard<std::mutex> lk(g_error_mutex);
+        tl_error_copy = g_last_error;
+    }
+    return tl_error_copy.c_str();
 }
 
 void smartmon_free_string(char * s) {
@@ -357,7 +407,7 @@ void smartmon_free_string(char * s) {
 
 int smartmon_scan_devices(char ** out_json) {
     if (!out_json) {
-        tl_last_error = "NULL output pointer";
+        set_last_error("NULL output pointer");
         return -1;
     }
     std::lock_guard<std::mutex> lk(g_mutex);
@@ -366,7 +416,7 @@ int smartmon_scan_devices(char ** out_json) {
         // Use the public overload that takes a types vector; empty means "all".
         smart_devtype_list types;
         if (!smi()->scan_smart_devices(devlist, types)) {
-            tl_last_error = smi()->get_errmsg();
+            set_last_error(smi()->get_errmsg());
             return -1;
         }
         std::string j;
@@ -382,14 +432,14 @@ int smartmon_scan_devices(char ** out_json) {
         *out_json = strdup(j.c_str());
         return *out_json ? 0 : -1;
     } catch (const std::exception & e) {
-        tl_last_error = e.what();
+        set_last_error(e.what());
         return -1;
     }
 }
 
 int smartmon_get_smart_data(const char * device, const char * dev_type, char ** out_json) {
     if (!out_json) {
-        tl_last_error = "NULL output pointer";
+        set_last_error("NULL output pointer");
         return -1;
     }
     std::lock_guard<std::mutex> lk(g_mutex);
@@ -403,7 +453,7 @@ int smartmon_get_smart_data(const char * device, const char * dev_type, char ** 
         } else if (dev->is_nvme()) {
             json = build_nvme_json(dev->to_nvme(), device);
         } else {
-            tl_last_error = std::string("unsupported device type: ") + dev->get_dev_type();
+            set_last_error(std::string("unsupported device type: ") + dev->get_dev_type());
             return -1;
         }
 
@@ -412,14 +462,14 @@ int smartmon_get_smart_data(const char * device, const char * dev_type, char ** 
         *out_json = strdup(json.c_str());
         return *out_json ? 0 : -1;
     } catch (const std::exception & e) {
-        tl_last_error = e.what();
+        set_last_error(e.what());
         return -1;
     }
 }
 
 int smartmon_check_health(const char * device, const char * dev_type, int * out_healthy) {
     if (!out_healthy) {
-        tl_last_error = "NULL output pointer";
+        set_last_error("NULL output pointer");
         return -1;
     }
     std::lock_guard<std::mutex> lk(g_mutex);
@@ -430,24 +480,24 @@ int smartmon_check_health(const char * device, const char * dev_type, int * out_
         if (dev->is_ata()) {
             int rc = ataSmartStatus2(dev->to_ata());
             if (rc < 0) {
-                tl_last_error = dev->get_errmsg();
+                set_last_error(dev->get_errmsg());
                 return -1;
             }
             *out_healthy = (rc == 1) ? 1 : 0;
         } else if (dev->is_nvme()) {
             nvme_smart_log sl = {};
             if (!nvme_read_smart_log(dev->to_nvme(), 0xFFFFFFFF, sl)) {
-                tl_last_error = dev->get_errmsg();
+                set_last_error(dev->get_errmsg());
                 return -1;
             }
             *out_healthy = (sl.critical_warning == 0) ? 1 : 0;
         } else {
-            tl_last_error = std::string("unsupported device type: ") + dev->get_dev_type();
+            set_last_error(std::string("unsupported device type: ") + dev->get_dev_type());
             return -1;
         }
         return 0;
     } catch (const std::exception & e) {
-        tl_last_error = e.what();
+        set_last_error(e.what());
         return -1;
     }
 }
@@ -458,16 +508,16 @@ int smartmon_enable_smart(const char * device, const char * dev_type) {
         auto dev = open_dev(device, dev_type);
         if (!dev) return -1;
         if (!dev->is_ata()) {
-            tl_last_error = "enable SMART is only supported on ATA devices";
+            set_last_error("enable SMART is only supported on ATA devices");
             return -1;
         }
         if (ataEnableSmart(dev->to_ata()) < 0) {
-            tl_last_error = dev->get_errmsg();
+            set_last_error(dev->get_errmsg());
             return -1;
         }
         return 0;
     } catch (const std::exception & e) {
-        tl_last_error = e.what();
+        set_last_error(e.what());
         return -1;
     }
 }
@@ -478,16 +528,16 @@ int smartmon_disable_smart(const char * device, const char * dev_type) {
         auto dev = open_dev(device, dev_type);
         if (!dev) return -1;
         if (!dev->is_ata()) {
-            tl_last_error = "disable SMART is only supported on ATA devices";
+            set_last_error("disable SMART is only supported on ATA devices");
             return -1;
         }
         if (ataDisableSmart(dev->to_ata()) < 0) {
-            tl_last_error = dev->get_errmsg();
+            set_last_error(dev->get_errmsg());
             return -1;
         }
         return 0;
     } catch (const std::exception & e) {
-        tl_last_error = e.what();
+        set_last_error(e.what());
         return -1;
     }
 }
@@ -495,13 +545,18 @@ int smartmon_disable_smart(const char * device, const char * dev_type) {
 int smartmon_run_selftest(const char * device, const char * dev_type, const char * test_type) {
     std::lock_guard<std::mutex> lk(g_mutex);
     try {
+        if (!test_type) {
+            set_last_error("NULL test type");
+            return -1;
+        }
+
         auto dev = open_dev(device, dev_type);
         if (!dev) return -1;
 
         if (dev->is_ata()) {
             ata_smart_values sv = {};
             if (ataReadSmartValues(dev->to_ata(), &sv) < 0) {
-                tl_last_error = std::string("failed to read SMART values for device ") + device + ": " + dev->get_errmsg();
+                set_last_error(std::string("failed to read SMART values for device ") + device + ": " + dev->get_errmsg());
                 return -1;
             }
 
@@ -513,12 +568,12 @@ int smartmon_run_selftest(const char * device, const char * dev_type, const char
             else if (strcmp(test_type, "conveyance") == 0)
                 testtype = CONVEYANCE_SELF_TEST;
             else {
-                tl_last_error = std::string("unknown test type: ") + test_type;
+                set_last_error(std::string("unknown test type: ") + test_type);
                 return -1;
             }
             if (ataSmartTest(dev->to_ata(), testtype, /*force=*/false,
                              ata_selective_selftest_args{}, &sv, /*num_sectors=*/0) < 0) {
-                tl_last_error = dev->get_errmsg();
+                set_last_error(dev->get_errmsg());
                 return -1;
             }
         } else if (dev->is_nvme()) {
@@ -528,20 +583,20 @@ int smartmon_run_selftest(const char * device, const char * dev_type, const char
             else if (strcmp(test_type, "long") == 0)
                 stc = 2;
             else {
-                tl_last_error = std::string("NVMe does not support test type: ") + test_type;
+                set_last_error(std::string("NVMe does not support test type: ") + test_type);
                 return -1;
             }
             if (!nvme_self_test(dev->to_nvme(), stc, 0)) {
-                tl_last_error = dev->get_errmsg();
+                set_last_error(dev->get_errmsg());
                 return -1;
             }
         } else {
-            tl_last_error = std::string("unsupported device type: ") + dev->get_dev_type();
+            set_last_error(std::string("unsupported device type: ") + dev->get_dev_type());
             return -1;
         }
         return 0;
     } catch (const std::exception & e) {
-        tl_last_error = e.what();
+        set_last_error(e.what());
         return -1;
     }
 }
@@ -555,26 +610,26 @@ int smartmon_abort_selftest(const char * device, const char * dev_type) {
         if (dev->is_ata()) {
             ata_smart_values sv = {};
             if (ataReadSmartValues(dev->to_ata(), &sv) < 0) {
-                tl_last_error = std::string("failed to read SMART values for device ") + device + ": " + dev->get_errmsg();
+                set_last_error(std::string("failed to read SMART values for device ") + device + ": " + dev->get_errmsg());
                 return -1;
             }
             if (ataSmartTest(dev->to_ata(), ABORT_SELF_TEST, /*force=*/false,
                              ata_selective_selftest_args{}, &sv, /*num_sectors=*/0) < 0) {
-                tl_last_error = dev->get_errmsg();
+                set_last_error(dev->get_errmsg());
                 return -1;
             }
         } else if (dev->is_nvme()) {
             if (!nvme_self_test(dev->to_nvme(), 0x0f, 0)) {  // 0x0f = abort
-                tl_last_error = dev->get_errmsg();
+                set_last_error(dev->get_errmsg());
                 return -1;
             }
         } else {
-            tl_last_error = std::string("unsupported device type: ") + dev->get_dev_type();
+            set_last_error(std::string("unsupported device type: ") + dev->get_dev_type());
             return -1;
         }
         return 0;
     } catch (const std::exception & e) {
-        tl_last_error = e.what();
+        set_last_error(e.what());
         return -1;
     }
 }

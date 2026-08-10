@@ -26,6 +26,10 @@ log() { echo "[core-go] $*" >&2; }
 
 # --- 1. Build the native core -----------------------------------------------
 log "building native/ (--with-pic)"
+# Matches ci-core.yml/ci-bindings-go.yml/release-core.yml: version detection
+# in native/src/getversion.sh errors out without a full git history (e.g. a
+# shallow clone or the native/upstream submodule not fully checked out).
+export SMARTMONTOOLS_TEST_BUILD=1
 cd "${REPO_ROOT}/native"
 ./autogen.sh --force
 mkdir -p build
@@ -82,9 +86,15 @@ log "found all ${FOUND_COUNT} expected symbols"
 log "checking smartmon_abi_version() against the Go binding's requirement"
 ABI_CHECK_SRC="${SCRIPT_DIR}/abi_check.c"
 ABI_CHECK_BIN="${REPO_ROOT}/native/build/abi_check"
-"${CXX:-cc}" -o "${ABI_CHECK_BIN}" "${ABI_CHECK_SRC}" -I"${REPO_ROOT}/native/capi" -ldl
-ABI_MAJOR_REQUIRED="$(grep -oP 'abiMajorRequired = \K[0-9]+' "${REPO_ROOT}/bindings/go/backends/lib/lib.go")"
-ABI_MINOR_REQUIRED="$(grep -oP 'abiMinorRequired = \K[0-9]+' "${REPO_ROOT}/bindings/go/backends/lib/lib.go")"
+# dlopen()/dlsym() live in libSystem on macOS, so there is no separate libdl
+# to link there; -ldl only applies to glibc/musl targets.
+DL_LIBS=()
+[ "$(uname -s)" = "Darwin" ] || DL_LIBS=(-ldl)
+"${CXX:-cc}" -o "${ABI_CHECK_BIN}" "${ABI_CHECK_SRC}" -I"${REPO_ROOT}/native/capi" "${DL_LIBS[@]}"
+# sed -nE instead of grep -oP: -P (PCRE) is a GNU grep extension, absent on
+# BSD/macOS grep.
+ABI_MAJOR_REQUIRED="$(sed -nE 's/.*abiMajorRequired = ([0-9]+).*/\1/p' "${REPO_ROOT}/bindings/go/backends/lib/lib.go")"
+ABI_MINOR_REQUIRED="$(sed -nE 's/.*abiMinorRequired = ([0-9]+).*/\1/p' "${REPO_ROOT}/bindings/go/backends/lib/lib.go")"
 "${ABI_CHECK_BIN}" "${WRAPPER}" "${ABI_MAJOR_REQUIRED}" "${ABI_MINOR_REQUIRED}"
 
 # --- 4. Go lib backend: dlopen + scan + JSON shape --------------------------

@@ -52,5 +52,5 @@ shellcheck.txt: $(SHELLSCRIPTS)
 
 if OS_WIN32_MINGW
 cleandist-win32 clean-vc distclean-vc maintainer-clean-vc:
-\t@:
+	@:
 endif
