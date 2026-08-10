@@ -941,6 +941,7 @@ AC_CONFIG_FILES([
   lib/Makefile
   lib/examples/Makefile
   src/Makefile
+  capi/Makefile
 ])
 AC_OUTPUT
 AC_PROG_MAKE_SET

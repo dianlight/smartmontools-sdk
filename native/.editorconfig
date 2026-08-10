@@ -32,10 +32,6 @@ indent_size = 8
 [/lib/csmisas.h]
 indent_size = 3
 
-[/src/getopt/getopt.*]
-indent_style = tab
-indent_size = 2
-
 [/include/smartmon/regex/regex.h]
 indent_style = tab
 indent_size = 2

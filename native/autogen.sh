@@ -16,7 +16,7 @@ while [ $# -gt 0 ]; do case $1 in
 esac; done
 
 # Check for CR/LF line endings
-if od -A n -t x1 src/smartctl.h | grep ' 0d' >/dev/null; then
+if od -A n -t x1 lib/dev_interface.cpp | grep ' 0d' >/dev/null; then
   echo "Warning: Checkout with CR/LF line endings, 'make dist' and related targets will not work."
 fi
 

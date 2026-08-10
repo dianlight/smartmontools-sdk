@@ -27,11 +27,11 @@ cppcheck: cppcheck.txt
 
 CPPCHECKFLAGS =
 cppcheck.txt:
-\t$(srcdir)/cppcheck.sh $(CPPCHECKFLAGS) > $@
+	$(srcdir)/cppcheck.sh $(CPPCHECKFLAGS) > $@
 
 # No man pages — htmlman and pdfman are no-ops
 htmlman pdfman:
-\t@:
+	@:
 
 # Create shellcheck report
 shellcheck: shellcheck.txt
@@ -46,9 +46,9 @@ SHELLSCRIPTS = \
         $(srcdir)/getversion.sh
 
 shellcheck.txt: $(SHELLSCRIPTS)
-\t$(ECHO_V_GEN) '  $(SHELLCHECK) $(SHELLCHECKFLAGS) $(SHELLSCRIPTS) > $@'
-\t@$(SHELLCHECK) $(SHELLCHECKFLAGS) $(SHELLSCRIPTS) > $@ || \
-\tif [ $$? = 1 ]; then echo "$@: issues found"; else rm -f $@; exit 1; fi
+	$(ECHO_V_GEN) '  $(SHELLCHECK) $(SHELLCHECKFLAGS) $(SHELLSCRIPTS) > $@'
+	@$(SHELLCHECK) $(SHELLCHECKFLAGS) $(SHELLSCRIPTS) > $@ || \
+	if [ $$? = 1 ]; then echo "$@: issues found"; else rm -f $@; exit 1; fi
 
 if OS_WIN32_MINGW
 cleandist-win32 clean-vc distclean-vc maintainer-clean-vc:
