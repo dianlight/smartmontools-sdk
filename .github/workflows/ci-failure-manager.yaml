@@ -3,7 +3,10 @@ name: CI Failure Issue Manager
 on:
   workflow_run:
     workflows:
-      - Build and Release
+      - CI (native core)
+      - CI (bindings/go)
+      - Release (native core)
+      - Release (bindings/go)
       - Check Submodule Updates
     types:
       - completed

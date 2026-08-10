@@ -27,7 +27,7 @@ jobs:
       - name: Check for new release tags
         id: check
         run: |
-          cd smartmontools
+          cd native/upstream
           git fetch --tags origin
 
           CURRENT_TAG=$(git describe --tags --exact-match 2>/dev/null || git rev-parse HEAD)
@@ -57,10 +57,10 @@ jobs:
       - name: Update submodule to latest release
         if: steps.check.outputs.has_update == 'true'
         run: |
-          cd smartmontools
+          cd native/upstream
           git checkout ${{ steps.check.outputs.new_tag }}
-          cd ..
-          git add smartmontools
+          cd ../..
+          git add native/upstream
 
       - name: Create Pull Request
         if: steps.check.outputs.has_update == 'true'
@@ -106,7 +106,7 @@ jobs:
       - name: Determine upstream drivedb branch
         id: branch
         run: |
-          VER=$(grep -o 'VERSION: [0-9.]*' drivedb/drivedb.h | head -1 | awk '{print $2}')
+          VER=$(grep -o 'VERSION: [0-9.]*' native/drivedb/drivedb.h | head -1 | awk '{print $2}')
           echo "drivedb_branch=drivedb/${VER}" >> "$GITHUB_OUTPUT"
           echo "Tracking upstream branch: drivedb/${VER}"
 
@@ -116,7 +116,7 @@ jobs:
           UPSTREAM_BRANCH="${{ steps.branch.outputs.drivedb_branch }}"
           git fetch --depth=1 https://github.com/smartmontools/smartmontools.git "${UPSTREAM_BRANCH}"
           git show FETCH_HEAD:smartmontools/drivedb.h > /tmp/upstream_drivedb.h
-          if diff -q drivedb/drivedb.h /tmp/upstream_drivedb.h > /dev/null; then
+          if diff -q native/drivedb/drivedb.h /tmp/upstream_drivedb.h > /dev/null; then
             echo "has_update=false" >> "$GITHUB_OUTPUT"
             echo "drivedb.h is already up to date"
           else
@@ -133,18 +133,21 @@ jobs:
           PR_BRANCH="update-drivedb"
 
           # Extract new/changed drive family names from the diff
-          NEW_DRIVES=$(diff drivedb/drivedb.h /tmp/upstream_drivedb.h \
+          NEW_DRIVES=$(diff native/drivedb/drivedb.h /tmp/upstream_drivedb.h \
             | grep '^+  { "' \
             | grep -v '"VERSION:\|"DEFAULT' \
             | sed 's/^+  { "\([^"]*\)".*/- \1/' \
             | sort -u)
 
-          # Update the file
-          cp /tmp/upstream_drivedb.h drivedb/drivedb.h
+          # Update the source of truth, then refresh the bindings/go/ copy
+          # (drivedb.h + drivedb_version.go) so this PR never diverges from
+          # the drift check in ci-bindings-go.yml.
+          cp /tmp/upstream_drivedb.h native/drivedb/drivedb.h
+          scripts/sync-drivedb-go.sh
 
           # Create/reset branch from current main and commit
           git checkout -B "${PR_BRANCH}" HEAD
-          git add drivedb/drivedb.h
+          git add native/drivedb/drivedb.h bindings/go/backends/exec/drivedb.h bindings/go/backends/exec/drivedb_version.go
           git commit -m "chore: update drivedb.h from upstream ${UPSTREAM_BRANCH}"
           git push origin "${PR_BRANCH}" --force
 
@@ -158,7 +161,7 @@ jobs:
                     fi
           
                     cat > /tmp/pr_body.md << EOF
-          Automated update of \`drivedb/drivedb.h\` from upstream [\`${UPSTREAM_BRANCH}\`](https://github.com/smartmontools/smartmontools/tree/${UPSTREAM_BRANCH}).
+          Automated update of \`native/drivedb/drivedb.h\` (and its generated \`bindings/go/backends/exec/\` copy) from upstream [\`${UPSTREAM_BRANCH}\`](https://github.com/smartmontools/smartmontools/tree/${UPSTREAM_BRANCH}).
           
           ${DRIVES_SECTION}
           
