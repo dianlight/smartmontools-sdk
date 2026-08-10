@@ -203,9 +203,11 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          TAG_SHA=$(gh api "repos/${{ github.repository }}/git/refs/tags/v${VERSION}" --jq .object.sha)
           gh release delete "v${VERSION}" --repo "${{ github.repository }}" --yes --cleanup-tag 2>/dev/null || true
           gh release create "v${VERSION}" \
             release/* \
+            --target "${TAG_SHA}" \
             --repo "${{ github.repository }}" \
             --title "smartmontools-sdk native core v${VERSION}" \
             --notes "Native core (libsmartmon.a + C ABI wrapper) build ${VERSION}." \

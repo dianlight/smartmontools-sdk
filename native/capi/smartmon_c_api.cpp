@@ -412,11 +412,16 @@ int smartmon_scan_devices(char ** out_json) {
     }
     std::lock_guard<std::mutex> lk(g_mutex);
     try {
+        smart_interface * iface = smi();
+        if (!iface) {
+            set_last_error("smart_interface not initialised; call smartmon_init() first");
+            return -1;
+        }
         smart_device_list devlist;
         // Use the public overload that takes a types vector; empty means "all".
         smart_devtype_list types;
-        if (!smi()->scan_smart_devices(devlist, types)) {
-            set_last_error(smi()->get_errmsg());
+        if (!iface->scan_smart_devices(devlist, types)) {
+            set_last_error(iface->get_errmsg());
             return -1;
         }
         std::string j;
@@ -457,7 +462,7 @@ int smartmon_get_smart_data(const char * device, const char * dev_type, char ** 
             return -1;
         }
 
-        if (json.empty()) return -1;  // tl_last_error already set by builder
+        if (json.empty()) return -1;  // g_last_error already set by builder
 
         *out_json = strdup(json.c_str());
         return *out_json ? 0 : -1;

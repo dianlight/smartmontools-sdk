@@ -158,6 +158,19 @@ func TestParseSmartctlVersion(t *testing.T) {
 
 const satFallbackDevice = "/dev/sata1"
 
+// execFailureExitError returns a real *exec.ExitError whose ExitCode() is 1
+// (bit 0 set, i.e. an "execution failure" per smartctl's exit-code bitmask),
+// unlike the zero-value &osexec.ExitError{} whose ExitCode() is -1 (no
+// ProcessState) and therefore satisfies every bitmask, masking bugs in
+// code that branches on a specific bit.
+func execFailureExitError(t *testing.T) error {
+	t.Helper()
+	cmd := osexec.Command("sh", "-c", "exit 1")
+	err := cmd.Run()
+	require.Error(t, err)
+	return err
+}
+
 const satFallbackJSON = `{
 "json_format_version": [1, 0],
 "smartctl": {"version": [7, 5], "exit_status": 0},
@@ -425,4 +438,47 @@ func TestGetSMARTInfo_WithMockExitErrorFallback(t *testing.T) {
 	info, _, err := b.getSMARTInfoInternal(context.Background(), satFallbackDevice)
 	require.NoError(t, err)
 	assert.Equal(t, satFallbackDevice, info.Device.Name)
+}
+
+func TestCheckHealth_WithMockExitErrorFallback(t *testing.T) {
+	commander := &mockCommander{cmds: map[string]*mockCmd{
+		"/usr/sbin/smartctl -H --nocheck=standby " + satFallbackDevice:           {err: execFailureExitError(t)},
+		"/usr/sbin/smartctl -H --nocheck=standby -d sat " + satFallbackDevice:    {output: []byte("PASSED")},
+		"/usr/sbin/smartctl -a -j --nocheck=standby -d sat " + satFallbackDevice: {output: []byte(satFallbackJSON)},
+	}}
+	b := newMinimalBackend(t)
+	b.commander = commander
+	healthy, err := b.CheckHealth(context.Background(), satFallbackDevice)
+	require.NoError(t, err)
+	assert.True(t, healthy)
+	cachedType, hasCached := b.getCachedDeviceType(satFallbackDevice)
+	assert.True(t, hasCached)
+	assert.Equal(t, "sat", cachedType)
+}
+
+func TestGetDeviceInfo_WithMockExitErrorFallback(t *testing.T) {
+	commander := &mockCommander{cmds: map[string]*mockCmd{
+		"/usr/sbin/smartctl -i -j --nocheck=standby " + satFallbackDevice:        {err: execFailureExitError(t)},
+		"/usr/sbin/smartctl -i -j --nocheck=standby -d sat " + satFallbackDevice: {output: []byte(satFallbackJSON)},
+		"/usr/sbin/smartctl -a -j --nocheck=standby -d sat " + satFallbackDevice: {output: []byte(satFallbackJSON)},
+	}}
+	b := newMinimalBackend(t)
+	b.commander = commander
+	info, err := b.GetDeviceInfo(context.Background(), satFallbackDevice)
+	require.NoError(t, err)
+	assert.Equal(t, "SAT Test Drive", info["model_name"])
+}
+
+func TestGetAvailableSelfTests_WithMockExitErrorFallback(t *testing.T) {
+	const capsJSON = `{"ata_smart_data": {"capabilities": {"self_tests_supported": true}}}`
+	commander := &mockCommander{cmds: map[string]*mockCmd{
+		"/usr/sbin/smartctl -c -j --nocheck=standby " + satFallbackDevice:        {err: execFailureExitError(t)},
+		"/usr/sbin/smartctl -c -j --nocheck=standby -d sat " + satFallbackDevice: {output: []byte(capsJSON)},
+		"/usr/sbin/smartctl -a -j --nocheck=standby -d sat " + satFallbackDevice: {output: []byte(satFallbackJSON)},
+	}}
+	b := newMinimalBackend(t)
+	b.commander = commander
+	info, err := b.GetAvailableSelfTests(context.Background(), satFallbackDevice)
+	require.NoError(t, err)
+	require.NotNil(t, info)
 }

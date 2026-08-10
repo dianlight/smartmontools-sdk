@@ -18,6 +18,9 @@ func PopulateSelfTestInfo(info *SelfTestInfo, ata *AtaSmartData, nvmeCaps *NvmeC
 		}
 		if ata.SelfTest != nil && ata.SelfTest.PollingMinutes != nil {
 			pm := ata.SelfTest.PollingMinutes
+			if info.Durations == nil {
+				info.Durations = make(map[string]int)
+			}
 			if pm.Short > 0 {
 				info.Durations["short"] = pm.Short
 			}

@@ -125,89 +125,111 @@ func loadDrivedbAddendum() map[string]string {
 	return cache
 }
 
+// usbIDPairPattern matches a USB vendor:product ID pair where either side
+// may be a plain hex literal or a limited regex (nested parenthesised
+// alternation and/or bracket character classes), e.g.:
+//
+//	0x152d:0x0578               plain
+//	0x(0bda|0dd8):0x9210        vendor alternatives
+//	0x152d:0x05(7[789]|80)      product alternatives with a nested class
+//	0x045b:0x022[9a]            product class with no enclosing parens
+//	0x1e91:0x(a([23]a5|4a[7e])|de46)   arbitrarily nested
+//
+// Wildcard product IDs like "0x0480:0x...." contain no chars from this set
+// after "0x", so they never match and are silently skipped, same as before.
+var usbIDPairPattern = regexp.MustCompile(`0x([0-9a-fA-F()|\[\]]+):0x([0-9a-fA-F()|\[\]]+)`)
+
 // extractUSBIDs extracts USB vendor:product IDs from a modelregexp pattern.
-// Returns a slice of IDs in format "0xVVVV:0xPPPP"
-// Handles both exact matches and expands common regex patterns.
+// Returns a slice of IDs in format "0xVVVV:0xPPPP", expanding any
+// parenthesised alternation or bracket character class on either side of
+// the pair into every concrete hex value it can produce.
 func extractUSBIDs(modelregexp string) []string {
 	var ids []string
 
-	// Pattern to match USB IDs with exact hex: 0xVVVV:0xPPPP
-	exactPattern := regexp.MustCompile(`(0x[0-9a-fA-F]{4}:0x[0-9a-fA-F]{4})`)
-	matches := exactPattern.FindAllString(modelregexp, -1)
-	ids = append(ids, matches...)
-
-	// Handle common regex patterns in product ID
-	// Pattern like "0x152d:0x05(7[789]|80)" -> expand to 0x0577, 0x0578, 0x0579, 0x0580
-	regexPattern := regexp.MustCompile(`(0x[0-9a-fA-F]{4}):0x([0-9a-fA-F]{2})\(([^\)]+)\)`)
-	regexMatches := regexPattern.FindAllStringSubmatch(modelregexp, -1)
-	for _, match := range regexMatches {
-		if len(match) >= 4 {
-			vendor := match[1]
-			prefix := match[2]
-			alternatives := match[3]
-
-			// Handle alternatives like "7[789]|80"
-			// Split by |
-			parts := strings.Split(alternatives, "|")
-			for _, part := range parts {
-				expandedIDs := expandProductIDPattern(vendor, prefix, part)
-				ids = append(ids, expandedIDs...)
+	for _, match := range usbIDPairPattern.FindAllStringSubmatch(modelregexp, -1) {
+		vendors := expandHexPattern(match[1])
+		products := expandHexPattern(match[2])
+		for _, vendor := range vendors {
+			for _, product := range products {
+				ids = append(ids, "0x"+vendor+":0x"+product)
 			}
 		}
 	}
 
-	// Handle patterns like "0x0480:0x...." (wildcard) - these are too broad to expand
-	// We'll skip these for now as they would create too many entries
-
 	return ids
 }
 
-// expandProductIDPattern expands a product ID pattern like "7[789]" to actual hex values
-func expandProductIDPattern(vendor, prefix, pattern string) []string {
-	var ids []string
+// expandHexPattern expands a limited regex over hex digits — literal
+// characters, bracket character classes ("[9a]"), and arbitrarily nested
+// parenthesised alternation ("(a|b|c)") — into every concrete string it can
+// produce. It has no notion of hex specifically; any character other than
+// '(', ')', '|', '[', ']' is treated as a literal to concatenate.
+func expandHexPattern(pattern string) []string {
+	p := &hexPatternParser{s: pattern}
+	return p.parseAlternation()
+}
 
-	// Handle character class patterns like "7[789]"
-	charClassPattern := regexp.MustCompile(`^(\w)\[([^\]]+)\]$`)
-	if match := charClassPattern.FindStringSubmatch(pattern); len(match) >= 3 {
-		firstChar := match[1]
-		chars := match[2]
-		// Pre-allocate slice based on character class size
-		ids = make([]string, 0, len(chars))
-		for _, c := range chars {
-			var buf strings.Builder
-			buf.WriteString(vendor)
-			buf.WriteString(":0x")
-			buf.WriteString(prefix)
-			buf.WriteRune(rune(firstChar[0]))
-			buf.WriteRune(c)
-			ids = append(ids, buf.String())
+type hexPatternParser struct {
+	s   string
+	pos int
+}
+
+// parseAlternation parses "concat1|concat2|...", stopping at ')' or end of
+// input, and returns the union of each alternative's expansions.
+func (p *hexPatternParser) parseAlternation() []string {
+	results := p.parseConcat()
+	for p.pos < len(p.s) && p.s[p.pos] == '|' {
+		p.pos++
+		results = append(results, p.parseConcat()...)
+	}
+	return results
+}
+
+// parseConcat parses a sequence of atoms until '|', ')', or end of input,
+// and returns the cartesian product of their expansions.
+func (p *hexPatternParser) parseConcat() []string {
+	results := []string{""}
+	for p.pos < len(p.s) {
+		switch p.s[p.pos] {
+		case '|', ')':
+			return results
+		case '(':
+			p.pos++
+			inner := p.parseAlternation()
+			if p.pos < len(p.s) && p.s[p.pos] == ')' {
+				p.pos++
+			}
+			results = cartesianConcat(results, inner)
+		case '[':
+			end := strings.IndexByte(p.s[p.pos:], ']')
+			if end == -1 {
+				results = cartesianConcat(results, []string{p.s[p.pos:]})
+				p.pos = len(p.s)
+				continue
+			}
+			chars := p.s[p.pos+1 : p.pos+end]
+			alternatives := make([]string, 0, len(chars))
+			for _, c := range chars {
+				alternatives = append(alternatives, string(c))
+			}
+			results = cartesianConcat(results, alternatives)
+			p.pos += end + 1
+		default:
+			results = cartesianConcat(results, []string{string(p.s[p.pos])})
+			p.pos++
 		}
-		return ids
 	}
+	return results
+}
 
-	// Handle simple hex values like "80"
-	if len(pattern) == 2 {
-		var buf strings.Builder
-		buf.WriteString(vendor)
-		buf.WriteString(":0x")
-		buf.WriteString(prefix)
-		buf.WriteString(pattern)
-		ids = append(ids, buf.String())
-		return ids
+func cartesianConcat(prefixes, suffixes []string) []string {
+	out := make([]string, 0, len(prefixes)*len(suffixes))
+	for _, prefix := range prefixes {
+		for _, suffix := range suffixes {
+			out = append(out, prefix+suffix)
+		}
 	}
-
-	// Handle full 4-digit hex like "0562"
-	if len(pattern) == 4 {
-		var buf strings.Builder
-		buf.WriteString(vendor)
-		buf.WriteString(":0x")
-		buf.WriteString(pattern)
-		ids = append(ids, buf.String())
-		return ids
-	}
-
-	// For other complex patterns, skip for now
-	return ids
+	return out
 }
 
 // isUnknownUSBBridge checks if the smartctl messages contain an "Unknown USB bridge" error

@@ -311,6 +311,11 @@ func (b *ExecBackend) CheckHealth(ctx context.Context, devicePath string) (bool,
 				b.logHandler.DebugContext(ctx, "Device in standby mode, cannot check health", "devicePath", devicePath)
 				return false, nil
 			}
+			// Execution failure (bits 0/2): the auto-detected protocol couldn't
+			// read the device. Probe -d sat once and retry with the now-cached type.
+			if b.probeSATOnExecutionFailure(ctx, devicePath, err) {
+				return b.CheckHealth(ctx, devicePath)
+			}
 			// Check output even if command returned non-zero exit code
 			// smartctl often returns non-zero even with valid output
 			if len(output) > 0 {
@@ -336,6 +341,11 @@ func (b *ExecBackend) GetDeviceInfo(ctx context.Context, devicePath string) (map
 		// Exit code 2: device in standby
 		if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode()&2 != 0 {
 			return nil, fmt.Errorf("device in standby mode")
+		}
+		// Execution failure (bits 0/2): the auto-detected protocol couldn't
+		// read the device. Probe -d sat once and retry with the now-cached type.
+		if b.probeSATOnExecutionFailure(ctx, devicePath, err) {
+			return b.GetDeviceInfo(ctx, devicePath)
 		}
 		return nil, fmt.Errorf("failed to get device info: %w", err)
 	}
@@ -378,6 +388,11 @@ func (b *ExecBackend) GetAvailableSelfTests(ctx context.Context, devicePath stri
 		// Exit code 2: device in standby
 		if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode()&2 != 0 {
 			return nil, fmt.Errorf("device in standby mode")
+		}
+		// Execution failure (bits 0/2): the auto-detected protocol couldn't
+		// read the device. Probe -d sat once and retry with the now-cached type.
+		if b.probeSATOnExecutionFailure(ctx, devicePath, err) {
+			return b.GetAvailableSelfTests(ctx, devicePath)
 		}
 		return nil, fmt.Errorf("failed to get capabilities: %w", err)
 	}
@@ -638,6 +653,28 @@ func (b *ExecBackend) retryWithDeviceType(ctx context.Context, devicePath, devic
 func (b *ExecBackend) retrySATFallback(ctx context.Context, devicePath string) (*SMARTInfo, bool) {
 	b.logHandler.InfoContext(ctx, "execution failure with default protocol, retrying with -d sat", "devicePath", devicePath)
 	return b.retryWithDeviceType(ctx, devicePath, "sat")
+}
+
+// probeSATOnExecutionFailure checks whether err represents a smartctl
+// execution failure (bits 0/2, mask 0x05) with no device type cached yet, and
+// if so probes and caches "-d sat" via retrySATFallback. Callers that get true
+// back should re-issue their own command: buildArgs will now pick up the
+// freshly cached type.
+//
+// This is the same execution-failure signal getSMARTInfoInternal already acts
+// on; it exists separately because CheckHealth/GetDeviceInfo/GetAvailableSelfTests
+// need to re-run their own smartctl subcommand (-H / -i -j / -c -j) rather than
+// use retrySATFallback's own "-a -j" result directly.
+func (b *ExecBackend) probeSATOnExecutionFailure(ctx context.Context, devicePath string, err error) bool {
+	exitErr, ok := err.(*exec.ExitError)
+	if !ok || exitErr.ExitCode()&0x05 == 0 {
+		return false
+	}
+	if _, hasCached := b.getCachedDeviceType(devicePath); hasCached {
+		return false
+	}
+	_, satOK := b.retrySATFallback(ctx, devicePath)
+	return satOK
 }
 
 // getSMARTInfoInternal is the implementation behind GetSMARTInfo. The second
