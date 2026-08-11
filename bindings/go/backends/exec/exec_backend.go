@@ -309,7 +309,7 @@ func (b *ExecBackend) CheckHealth(ctx context.Context, devicePath string) (bool,
 			if exitCode != -1 && exitCode&2 != 0 {
 				// Device in standby - cannot determine health
 				b.logHandler.DebugContext(ctx, "Device in standby mode, cannot check health", "devicePath", devicePath)
-				return false, nil
+				return false, fmt.Errorf("device in standby mode")
 			}
 			// Execution failure (bits 0/2): the auto-detected protocol couldn't
 			// read the device. Probe -d sat once and retry with the now-cached type.

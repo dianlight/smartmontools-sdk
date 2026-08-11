@@ -101,6 +101,7 @@ import comparebackend "github.com/dianlight/smartmontools-sdk/bindings/go/v8/bac
 package main
 
 import (
+    "context"
     "fmt"
     "log"
 
@@ -108,6 +109,8 @@ import (
 )
 
 func main() {
+    ctx := context.Background()
+
     // Create a new client
     client, err := smartmontools.NewClient()
     if err != nil {
@@ -115,7 +118,7 @@ func main() {
     }
 
     // Scan for devices
-    devices, err := client.ScanDevices()
+    devices, err := client.ScanDevices(ctx)
     if err != nil {
         log.Fatalf("Failed to scan devices: %v", err)
     }
@@ -124,7 +127,7 @@ func main() {
         fmt.Printf("Device: %s (type: %s)\n", device.Name, device.Type)
         
         // Check health
-        healthy, err := client.CheckHealth(device.Name)
+        healthy, err := client.CheckHealth(ctx, device.Name)
         if err != nil {
             log.Printf("Failed to check health: %v", err)
             continue
@@ -143,7 +146,7 @@ func main() {
 
 ```go
 // Get detailed SMART information
-smartInfo, err := client.GetSMARTInfo("/dev/sda")
+smartInfo, err := client.GetSMARTInfo(ctx, "/dev/sda")
 if err != nil {
     log.Fatalf("Failed to get SMART info: %v", err)
 }
@@ -165,7 +168,7 @@ if smartInfo.AtaSmartData != nil {
 
 ```go
 // Run a short self-test
-err := client.RunSelfTest("/dev/sda", "short")
+err := client.RunSelfTest(ctx, "/dev/sda", "short")
 if err != nil {
     log.Fatalf("Failed to run self-test: %v", err)
 }
@@ -454,9 +457,10 @@ The library includes automatic support for USB storage devices that use unknown 
 
 ```go
 client, _ := smartmontools.NewClient()
+ctx := context.Background()
 
 // Works automatically with USB bridges, even if unknown to smartctl
-info, err := client.GetSMARTInfo("/dev/disk/by-id/usb-Intenso_Memory_Center-0:0")
+info, err := client.GetSMARTInfo(ctx, "/dev/disk/by-id/usb-Intenso_Memory_Center-0:0")
 if err != nil {
     log.Fatalf("Failed to get SMART info: %v", err)
 }
