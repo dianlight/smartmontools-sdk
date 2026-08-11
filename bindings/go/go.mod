@@ -4,7 +4,7 @@ go 1.26
 
 require (
 	github.com/dianlight/tlog v0.2.2
-	github.com/ebitengine/purego v0.10.0
+	github.com/ebitengine/purego v0.10.2
 	github.com/stretchr/testify v1.11.1
 )
 
