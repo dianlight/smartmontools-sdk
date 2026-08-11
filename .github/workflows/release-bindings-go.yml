@@ -5,6 +5,27 @@ on:
     tags:
       - 'bindings/go/v*'
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Bindings version to release (e.g. 8.0.0), without the bindings/go/v prefix. Takes precedence over core_version and bump.'
+        required: false
+        type: string
+      core_version:
+        description: 'Core version to mirror (e.g. 8.0.0) — used when this is dispatched as part of a core release cascade. Ignored if version is set.'
+        required: false
+        type: string
+      bump:
+        description: 'Standalone version bump for a Go-only release, independent of any core release. Ignored if version or core_version is set.'
+        required: false
+        type: choice
+        options:
+          - patch
+          - minor
+      dry_run:
+        description: 'Print what would happen without creating a tag, publishing a release, or warming the proxy.'
+        required: false
+        type: boolean
+        default: true
 
 permissions:
   contents: write
@@ -12,40 +33,97 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+          fetch-tags: true
 
-      - name: Determine version and module path
+      - name: Determine version
         id: version
         run: |
-          TAG="${GITHUB_REF_NAME}"
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            TAG=$(git tag -l 'bindings/go/v*' --sort=-version:refname | head -n1)
+          if [ "${{ github.event_name }}" = "push" ]; then
+            TAG="${GITHUB_REF_NAME}"
+          elif [ -n "${{ github.event.inputs.version }}" ]; then
+            V="${{ github.event.inputs.version }}"
+            TAG="bindings/go/v${V#v}"
+          elif [ -n "${{ github.event.inputs.core_version }}" ]; then
+            TAG="$(scripts/next-bindings-go-version.sh --core-version "${{ github.event.inputs.core_version }}")"
+          elif [ -n "${{ github.event.inputs.bump }}" ]; then
+            TAG="$(scripts/next-bindings-go-version.sh --bump "${{ github.event.inputs.bump }}")"
+          else
+            TAG="$(scripts/next-bindings-go-version.sh --current)"
+            if [ -z "${TAG}" ]; then
+              echo "::error::no existing bindings/go release, and none of 'version', 'core_version', or 'bump' were given." >&2
+              exit 1
+            fi
           fi
+
           VERSION="${TAG#bindings/go/}"
+
+          DRY_RUN="false"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            DRY_RUN="${{ github.event.inputs.dry_run }}"
+          fi
+
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
-          echo "Releasing bindings/go ${VERSION}"
+          echo "dry_run=${DRY_RUN}" >> "$GITHUB_OUTPUT"
+          echo "Releasing bindings/go ${VERSION} (tag ${TAG}, dry_run=${DRY_RUN})"
+
+      - name: Ensure tag exists
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          TAG="${{ steps.version.outputs.tag }}"
+          if git rev-parse "${TAG}" >/dev/null 2>&1; then
+            echo "Tag ${TAG} already exists."
+          elif [ "${{ steps.version.outputs.dry_run }}" = "true" ]; then
+            echo "[dry-run] would create and push tag ${TAG}"
+          else
+            git tag "${TAG}"
+            git push origin "${TAG}"
+          fi
 
       - name: Warm the Go module proxy
+        if: steps.version.outputs.dry_run != 'true'
+        working-directory: bindings/go
         env:
           GOPROXY: proxy.golang.org
         run: |
-          go list -m "github.com/dianlight/smartmontools-sdk/bindings/go@${{ steps.version.outputs.tag }}" || true
+          TAG="${{ steps.version.outputs.tag }}"
+          if ! go list -m "github.com/dianlight/smartmontools-sdk/bindings/go/v8@${TAG}"; then
+            echo "::warning::failed to warm the Go module proxy for ${TAG} — non-fatal, the module will still be fetchable on first consumer request."
+          fi
+
+      - name: Dry-run summary
+        if: steps.version.outputs.dry_run == 'true'
+        run: |
+          echo "[dry-run] would create/update release ${{ steps.version.outputs.tag }} and skip proxy warm-up."
 
       - name: Create or update release
+        if: steps.version.outputs.dry_run != 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG="${{ steps.version.outputs.tag }}"
           VERSION="${{ steps.version.outputs.version }}"
           TAG_SHA=$(git rev-list -n1 "${TAG}")
-          gh release delete "${TAG}" --repo "${{ github.repository }}" --yes --cleanup-tag 2>/dev/null || true
+
+          {
+            echo "Go bindings release ${VERSION}."
+            echo
+            echo "Install with: \`go get github.com/dianlight/smartmontools-sdk/bindings/go/v8@${TAG}\`"
+            if [ -n "${{ github.event.inputs.core_version }}" ]; then
+              echo
+              echo "Paired with native core [\`v${{ github.event.inputs.core_version }}\`](https://github.com/${{ github.repository }}/releases/tag/v${{ github.event.inputs.core_version }})."
+            fi
+          } > release-notes.md
+
+          gh release delete "${TAG}" --repo "${{ github.repository }}" --yes 2>/dev/null || true
           gh release create "${TAG}" \
             --target "${TAG_SHA}" \
             --repo "${{ github.repository }}" \
             --title "bindings/go ${VERSION}" \
-            --notes "Go bindings release ${VERSION}. Install with: go get github.com/dianlight/smartmontools-sdk/bindings/go@${TAG}" \
+            --notes-file release-notes.md \
             --latest=false

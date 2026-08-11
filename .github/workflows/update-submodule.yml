@@ -12,6 +12,7 @@ permissions:
 jobs:
   check-update:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
         with:
@@ -24,29 +25,51 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Check for new release tags
-        id: check
+      - name: Skip if an update PR is already open
+        id: existing
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          cd native/upstream
-          git fetch --tags origin
+          # A conflicted merge attempt is pushed as-is for a human to resolve
+          # (see the merge step below); re-running this job must never
+          # force-push over that in-progress resolution.
+          OPEN_BRANCH=$(gh pr list --state open --json headRefName \
+            -q '.[] | select(.headRefName | startswith("update-smartmontools-")) | .headRefName' | head -n1)
+          if [ -n "${OPEN_BRANCH}" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "An update PR is already open on ${OPEN_BRANCH} — skipping until it is merged or closed."
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
 
-          CURRENT_TAG=$(git describe --tags --exact-match 2>/dev/null || git rev-parse HEAD)
-          echo "Current submodule ref: ${CURRENT_TAG}"
+      - name: Fetch upstream and check for an unmerged release
+        id: check
+        if: steps.existing.outputs.skip == 'false'
+        run: |
+          git remote add upstream https://github.com/smartmontools/smartmontools.git
+          git fetch upstream --tags
 
           LATEST_TAG=$(git tag -l 'RELEASE_*' --sort=-version:refname | head -n1)
           if [ -z "$LATEST_TAG" ]; then
-            echo "No release tags found"
+            echo "No upstream release tags found"
             echo "has_update=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
+          echo "Latest upstream release tag: ${LATEST_TAG}"
 
-          echo "Latest release tag: ${LATEST_TAG}"
-
-          if [ "$CURRENT_TAG" = "$LATEST_TAG" ]; then
-            echo "Submodule is already at latest release"
+          # A completed `git merge <tag>` makes that tag's commit an ancestor
+          # of our HEAD by construction, so this is a reliable "already
+          # merged" test regardless of whether the tag sits on upstream's own
+          # main (see docs/development/release-process.md — upstream's own
+          # RELEASE_7_5 tag object is a known historical exception: it is
+          # content-identical to, but not the same commit as, what this
+          # repo's history actually merged; this self-heals after one run
+          # with a harmless empty-diff PR, since the gate below rejects it).
+          if git merge-base --is-ancestor "${LATEST_TAG}" HEAD; then
+            echo "Already merged into main"
             echo "has_update=false" >> "$GITHUB_OUTPUT"
           else
-            echo "Update available: ${CURRENT_TAG} -> ${LATEST_TAG}"
+            echo "Not yet merged — will attempt to merge ${LATEST_TAG}"
             echo "has_update=true" >> "$GITHUB_OUTPUT"
             echo "new_tag=${LATEST_TAG}" >> "$GITHUB_OUTPUT"
             VERSION="${LATEST_TAG#RELEASE_}"
@@ -54,15 +77,7 @@ jobs:
             echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Update submodule to latest release
-        if: steps.check.outputs.has_update == 'true'
-        run: |
-          cd native/upstream
-          git checkout ${{ steps.check.outputs.new_tag }}
-          cd ../..
-          git add native/upstream
-
-      - name: Create Pull Request
+      - name: Merge upstream release and open a Pull Request
         if: steps.check.outputs.has_update == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -72,26 +87,54 @@ jobs:
           TAG="${{ steps.check.outputs.new_tag }}"
 
           git checkout -b "${BRANCH}"
-          git commit -m "chore: update smartmontools submodule to ${TAG}"
-          git push origin "${BRANCH}" --force
 
-          EXISTING_PR=$(gh pr list --head "${BRANCH}" --json number -q '.[0].number')
-          if [ -n "$EXISTING_PR" ]; then
-            echo "PR #${EXISTING_PR} already exists for branch ${BRANCH}"
-          else
+          # Kept for audit continuity only — nothing in the build reads this
+          # gitlink (see docs/architecture/repository-layout.md); the actual
+          # source update below is the real re-vendoring mechanism.
+          (cd native/upstream && git fetch --tags origin && git checkout "${TAG}")
+          git add native/upstream
+
+          if git merge --no-commit --no-ff "${TAG}"; then
+            git commit -m "Merge smartmontools ${TAG}
+
+          Automated re-vendoring merge of upstream release ${TAG} into native/,
+          plus the corresponding native/upstream gitlink bump."
+            git push origin "${BRANCH}" --force
+
             gh pr create \
-              --title "Update smartmontools to v${VERSION}" \
-              --body "Automated update of smartmontools submodule to release tag \`${TAG}\` (v${VERSION}).
+              --title "Merge smartmontools ${TAG} (v${VERSION})" \
+              --body "Automated merge of upstream release tag \`${TAG}\` into \`native/\`, carrying the real source diff (this is a genuine \`git merge\`, not a submodule bump — see docs/architecture/repository-layout.md).
 
-              This PR was created automatically by the submodule update checker workflow.
+          Once this PR merges to \`main\`, \`tag-core-release.yml\` will detect the merge, compute the next core version (\`scripts/next-core-version.sh\`), tag it, and dispatch \`release-core.yml\` — which builds every target, publishes the core release, and then dispatches \`release-bindings-go.yml\` to publish a paired bindings release at the same version. If this merge happens to change nothing in the native-core build artifact (see \`scripts/core-artifact-changed.sh\`), that gate will skip tagging and open a tracking issue instead of shipping a no-op release." \
+              --base main \
+              --head "${BRANCH}"
+          else
+            CONFLICTS=$(git diff --name-only --diff-filter=U)
+            git add -A
+            git commit -m "Merge smartmontools ${TAG} (CONFLICTS — needs manual resolution)
 
-              Once merged, the build workflow will produce library artifacts and create a release tagged \`v${VERSION}\`." \
-                            --base main \
-                            --head "${BRANCH}"
+          Conflicting paths:
+          ${CONFLICTS}"
+            git push origin "${BRANCH}" --force
+
+            gh pr create \
+              --draft \
+              --title "Merge smartmontools ${TAG} (v${VERSION}) — CONFLICTS" \
+              --body "Automated merge of upstream release tag \`${TAG}\` hit conflicts and needs manual resolution. The conflict markers are committed as-is on this branch — checkout \`${BRANCH}\`, resolve the markers below, then \`git add\` and amend or add a follow-up commit.
+
+          ### Conflicting paths
+          \`\`\`
+          ${CONFLICTS}
+          \`\`\`
+
+          This is the expected common case: our tree has deliberately deleted the smartctl/smartd CLI sources under \`native/src/\` that upstream still carries, so most upstream releases will conflict on exactly those paths. Once resolved and merged to \`main\`, the same cascade described in the non-conflict case applies." \
+              --base main \
+              --head "${BRANCH}"
           fi
 
   check-drivedb:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
         with:
