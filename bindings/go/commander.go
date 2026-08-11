@@ -2,7 +2,7 @@
 
 package smartmontools
 
-import smtypes "github.com/dianlight/smartmontools-sdk/bindings/go/types"
+import smtypes "github.com/dianlight/smartmontools-sdk/bindings/go/v8/types"
 
 // Commander is the interface for executing OS commands.
 type Commander = smtypes.Commander

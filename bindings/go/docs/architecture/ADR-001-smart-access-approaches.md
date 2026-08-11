@@ -95,7 +95,7 @@ package main
 import (
     "fmt"
     "log"
-    "github.com/dianlight/smartmontools-sdk/bindings/go"
+    "github.com/dianlight/smartmontools-sdk/bindings/go/v8"
 )
 
 func main() {

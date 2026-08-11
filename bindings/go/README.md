@@ -78,19 +78,19 @@ Point the backend at the compiled library via the `SMARTMON_LIB_PATH` environmen
 ## Installation
 
 ```bash
-go get github.com/dianlight/smartmontools-sdk/bindings/go
+go get github.com/dianlight/smartmontools-sdk/bindings/go/v8
 ```
 
 To use **LibBackend** also import the backend sub-package in your code:
 
 ```go
-import libbackend "github.com/dianlight/smartmontools-sdk/bindings/go/backends/lib"
+import libbackend "github.com/dianlight/smartmontools-sdk/bindings/go/v8/backends/lib"
 ```
 
 To use **CompareBackend**:
 
 ```go
-import comparebackend "github.com/dianlight/smartmontools-sdk/bindings/go/backends/compare"
+import comparebackend "github.com/dianlight/smartmontools-sdk/bindings/go/v8/backends/compare"
 ```
 
 ## Usage
@@ -104,7 +104,7 @@ import (
     "fmt"
     "log"
 
-    "github.com/dianlight/smartmontools-sdk/bindings/go"
+    "github.com/dianlight/smartmontools-sdk/bindings/go/v8"
 )
 
 func main() {
@@ -285,7 +285,7 @@ Override the logger for a specific client instance:
 import (
     "context"
     "log"
-    "github.com/dianlight/smartmontools-sdk/bindings/go"
+    "github.com/dianlight/smartmontools-sdk/bindings/go/v8"
     "github.com/dianlight/tlog"
 )
 
@@ -369,8 +369,8 @@ Build the wrapper library first (see [LibBackend prerequisites](#libbackend-prer
 
 ```go
 import (
-    smartmontools "github.com/dianlight/smartmontools-sdk/bindings/go"
-    libbackend "github.com/dianlight/smartmontools-sdk/bindings/go/backends/lib"
+    smartmontools "github.com/dianlight/smartmontools-sdk/bindings/go/v8"
+    libbackend "github.com/dianlight/smartmontools-sdk/bindings/go/v8/backends/lib"
 )
 
 lib, err := libbackend.New(
@@ -411,10 +411,10 @@ before switching.
 
 ```go
 import (
-    smartmontools "github.com/dianlight/smartmontools-sdk/bindings/go"
-    comparebackend "github.com/dianlight/smartmontools-sdk/bindings/go/backends/compare"
-    execbackend "github.com/dianlight/smartmontools-sdk/bindings/go/backends/exec"
-    libbackend "github.com/dianlight/smartmontools-sdk/bindings/go/backends/lib"
+    smartmontools "github.com/dianlight/smartmontools-sdk/bindings/go/v8"
+    comparebackend "github.com/dianlight/smartmontools-sdk/bindings/go/v8/backends/compare"
+    execbackend "github.com/dianlight/smartmontools-sdk/bindings/go/v8/backends/exec"
+    libbackend "github.com/dianlight/smartmontools-sdk/bindings/go/v8/backends/lib"
 )
 
 exec, err := execbackend.New()

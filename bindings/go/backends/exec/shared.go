@@ -2,7 +2,7 @@
 
 package exec
 
-import smtypes "github.com/dianlight/smartmontools-sdk/bindings/go/types"
+import smtypes "github.com/dianlight/smartmontools-sdk/bindings/go/v8/types"
 
 // Shared interface aliases keep the exec backend decoupled from the root package.
 type (

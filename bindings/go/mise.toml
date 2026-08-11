@@ -66,21 +66,21 @@ description = "Generate API documentation (APIDOC.md)"
 run = "gomarkdoc -o APIDOC.md ."
 
 [tasks.release]
-description = "Create and push a bindings/go/vX.Y.Z tag. On main: stable release. On a branch with open PR: prerelease. No PR: error."
+description = "Create and push a standalone bindings/go/vX.Y.Z tag (patch/minor only — a core-paired release is dispatched automatically by release-core.yml instead). On main: stable release. On a branch with open PR: prerelease. No PR: error."
 usage = '''
-arg "[version_type]" help="Version bump type" default="patch" {
-  choices "major" "minor" "patch"
+arg "[version_type]" help="Version bump type. Major is not offered here: it changes the module's /vN import path and must be done manually (see docs/development/release-process.md) before any tag is cut." default="patch" {
+  choices "minor" "patch"
 }
 flag "--dry-run" help="Print what would happen without creating or pushing the tag"
 '''
 run = '''
 VERSION_TYPE="${usage_version_type?}"
 BRANCH=$(git rev-parse --abbrev-ref HEAD)
-CURRENT_TAG=$(git describe --tags --match "bindings/go/v*" --abbrev=0 2>/dev/null || echo "bindings/go/v0.0.0")
-CURRENT_VERSION_TAG=${CURRENT_TAG#bindings/go/}
+SCRIPT_DIR="$(git rev-parse --show-toplevel)/scripts"
 
 if [ "$BRANCH" = "main" ]; then
   MODE="release"
+  NEW_TAG=$("$SCRIPT_DIR/next-bindings-go-version.sh" --bump "$VERSION_TYPE")
 else
   PR_URL=$(gh pr list --head "$BRANCH" --state open --json url --jq '.[0].url // ""')
   if [ -z "$PR_URL" ]; then
@@ -90,35 +90,27 @@ else
   fi
   echo "PR: $PR_URL"
   MODE="prerelease"
+  CURRENT_TAG=$(git describe --tags --match "bindings/go/v*" --abbrev=0 2>/dev/null || echo "bindings/go/v0.0.0")
+  CURRENT_VERSION_TAG=${CURRENT_TAG#bindings/go/}
+  if [[ "$CURRENT_VERSION_TAG" == *-* ]]; then
+    PRERELEASE_PART=$(echo "$CURRENT_VERSION_TAG" | sed 's/.*-//')
+    N=$(echo "$PRERELEASE_PART" | cut -d. -f2)
+    NEW_N=$((N + 1))
+    NEW_VERSION_TAG=$(echo "$CURRENT_VERSION_TAG" | sed "s/\.[0-9]*$/.$NEW_N/")
+  else
+    BASE=$("$SCRIPT_DIR/next-bindings-go-version.sh" --bump "$VERSION_TYPE")
+    NEW_VERSION_TAG="${BASE#bindings/go/}-beta.0"
+  fi
+  NEW_TAG="bindings/go/$NEW_VERSION_TAG"
 fi
 
-if [ "$MODE" = "prerelease" ] && [[ "$CURRENT_VERSION_TAG" == *-* ]]; then
-  PRERELEASE_PART=$(echo "$CURRENT_VERSION_TAG" | sed 's/.*-//')
-  N=$(echo "$PRERELEASE_PART" | cut -d. -f2)
-  NEW_N=$((N + 1))
-  NEW_VERSION_TAG=$(echo "$CURRENT_VERSION_TAG" | sed "s/\.[0-9]*$/.$NEW_N/")
-else
-  CURRENT_VERSION=$(echo "$CURRENT_VERSION_TAG" | sed 's/^v//' | sed 's/-.*//')
-  MAJOR=$(echo "$CURRENT_VERSION" | cut -d. -f1)
-  MINOR=$(echo "$CURRENT_VERSION" | cut -d. -f2)
-  PATCH=$(echo "$CURRENT_VERSION" | cut -d. -f3)
-  case $VERSION_TYPE in
-    major) NEW_MAJOR=$((MAJOR + 1)); NEW_MINOR=0; NEW_PATCH=0 ;;
-    minor) NEW_MAJOR=$MAJOR; NEW_MINOR=$((MINOR + 1)); NEW_PATCH=0 ;;
-    patch) NEW_MAJOR=$MAJOR; NEW_MINOR=$MINOR; NEW_PATCH=$((PATCH + 1)) ;;
-  esac
-  BASE="v$NEW_MAJOR.$NEW_MINOR.$NEW_PATCH"
-  if [ "$MODE" = "prerelease" ]; then NEW_VERSION_TAG="$BASE-beta.0"; else NEW_VERSION_TAG="$BASE"; fi
-fi
-
-NEW_TAG="bindings/go/$NEW_VERSION_TAG"
 echo "Mode: $MODE | Branch: $BRANCH | Tag: $NEW_TAG"
 if [ "${usage_dry_run:-false}" = "true" ]; then
   echo "[dry-run] git tag $NEW_TAG && git push origin $NEW_TAG"
-  echo "[dry-run] GOPROXY=proxy.golang.org go list -m github.com/dianlight/smartmontools-sdk/bindings/go@$NEW_TAG"
+  echo "[dry-run] GOPROXY=proxy.golang.org go list -m github.com/dianlight/smartmontools-sdk/bindings/go/v8@$NEW_TAG"
 else
   git tag "$NEW_TAG" && git push origin "$NEW_TAG"
-  GOPROXY=proxy.golang.org go list -m "github.com/dianlight/smartmontools-sdk/bindings/go@$NEW_TAG"
+  GOPROXY=proxy.golang.org go list -m "github.com/dianlight/smartmontools-sdk/bindings/go/v8@$NEW_TAG"
 fi
 '''
 

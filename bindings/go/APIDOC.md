@@ -3,7 +3,7 @@
 # smartmontools
 
 ```go
-import "github.com/dianlight/smartmontools-sdk/bindings/go"
+import "github.com/dianlight/smartmontools-sdk/bindings/go/v8"
 ```
 
 Package smartmontools provides Go bindings for interfacing with smartmontools to monitor and manage storage device health using S.M.A.R.T. data.
@@ -68,7 +68,7 @@ import (
     "fmt"
     "log"
 
-    "github.com/dianlight/smartmontools-sdk/bindings/go"
+    "github.com/dianlight/smartmontools-sdk/bindings/go/v8"
 )
 
 func main() {
@@ -233,7 +233,7 @@ const (
 ```
 
 <a name="AtaSmartData"></a>
-## type [AtaSmartData](<https://github.com/dianlight/smartmontools-sdk/bindings/go/blob/main/types.go#L90-L95>)
+## type [AtaSmartData](<https://github.com/dianlight/smartmontools-sdk/bindings/go/v8/blob/main/types.go#L90-L95>)
 
 AtaSmartData represents ATA SMART attributes
 
@@ -247,7 +247,7 @@ type AtaSmartData struct {
 ```
 
 <a name="Capabilities"></a>
-## type [Capabilities](<https://github.com/dianlight/smartmontools-sdk/bindings/go/blob/main/types.go#L152-L157>)
+## type [Capabilities](<https://github.com/dianlight/smartmontools-sdk/bindings/go/v8/blob/main/types.go#L152-L157>)
 
 Capabilities represents SMART capabilities
 
@@ -261,7 +261,7 @@ type Capabilities struct {
 ```
 
 <a name="CapabilitiesOutput"></a>
-## type [CapabilitiesOutput](<https://github.com/dianlight/smartmontools-sdk/bindings/go/blob/main/types.go#L171-L175>)
+## type [CapabilitiesOutput](<https://github.com/dianlight/smartmontools-sdk/bindings/go/v8/blob/main/types.go#L171-L175>)
 
 CapabilitiesOutput represents the output of smartctl \-c \-j
 
@@ -274,7 +274,7 @@ type CapabilitiesOutput struct {
 ```
 
 <a name="Client"></a>
-## type [Client](<https://github.com/dianlight/smartmontools-sdk/bindings/go/blob/main/client.go#L101-L111>)
+## type [Client](<https://github.com/dianlight/smartmontools-sdk/bindings/go/v8/blob/main/client.go#L101-L111>)
 
 Client represents a smartmontools client
 
@@ -285,7 +285,7 @@ type Client struct {
 ```
 
 <a name="Client.AbortSelfTest"></a>
-### func \(\*Client\) [AbortSelfTest](<https://github.com/dianlight/smartmontools-sdk/bindings/go/blob/main/client.go#L965>)
+### func \(\*Client\) [AbortSelfTest](<https://github.com/dianlight/smartmontools-sdk/bindings/go/v8/blob/main/client.go#L965>)
 
 ```go
 func (c *Client) AbortSelfTest(ctx context.Context, devicePath string) error
@@ -294,7 +294,7 @@ func (c *Client) AbortSelfTest(ctx context.Context, devicePath string) error
 AbortSelfTest aborts a running self\-test on a device
 
 <a name="Client.CheckHealth"></a>
-### func \(\*Client\) [CheckHealth](<https://github.com/dianlight/smartmontools-sdk/bindings/go/blob/main/client.go#L538>)
+### func \(\*Client\) [CheckHealth](<https://github.com/dianlight/smartmontools-sdk/bindings/go/v8/blob/main/client.go#L538>)
 
 ```go
 func (c *Client) CheckHealth(ctx context.Context, devicePath string) (bool, error)
@@ -303,7 +303,7 @@ func (c *Client) CheckHealth(ctx context.Context, devicePath string) (bool, erro
 CheckHealth checks if a device is healthy according to SMART
 
 <a name="Client.DisableSMART"></a>
-### func \(\*Client\) [DisableSMART](<https://github.com/dianlight/smartmontools-sdk/bindings/go/blob/main/client.go#L936>)
+### func \(\*Client\) [DisableSMART](<https://github.com/dianlight/smartmontools-sdk/bindings/go/v8/blob/main/client.go#L936>)
 
 ```go
 func (c *Client) DisableSMART(ctx context.Context, devicePath string) error
@@ -312,7 +312,7 @@ func (c *Client) DisableSMART(ctx context.Context, devicePath string) error
 DisableSMART disables SMART monitoring on a device Note: NVMe devices do not support disabling SMART, an error will be returned
 
 <a name="Client.DiscoverDevices"></a>
-### func \(\*Client\) [DiscoverDevices](<https://github.com/dianlight/smartmontools-sdk/bindings/go/blob/main/client.go#L997>)
+### func \(\*Client\) [DiscoverDevices](<https://github.com/dianlight/smartmontools-sdk/bindings/go/v8/blob/main/client.go#L997>)
 
 ```go
 func (c *Client) DiscoverDevices(ctx context.Context) ([]DiscoveryResult, error)
@@ -340,7 +340,7 @@ for _, r := range results {
 ```
 
 <a name="Client.EnableSMART"></a>
-### func \(\*Client\) [EnableSMART](<https://github.com/dianlight/smartmontools-sdk/bindings/go/blob/main/client.go#L925>)
+### func \(\*Client\) [EnableSMART](<https://github.com/dianlight/smartmontools-sdk/bindings/go/v8/blob/main/client.go#L925>)
 
 ```go
 func (c *Client) EnableSMART(ctx context.Context, devicePath string) error
@@ -349,7 +349,7 @@ func (c *Client) EnableSMART(ctx context.Context, devicePath string) error
 EnableSMART enables SMART monitoring on a device
 
 <a name="Client.GetAvailableSelfTests"></a>
-### func \(\*Client\) [GetAvailableSelfTests](<https://github.com/dianlight/smartmontools-sdk/bindings/go/blob/main/client.go#L782>)
+### func \(\*Client\) [GetAvailableSelfTests](<https://github.com/dianlight/smartmontools-sdk/bindings/go/v8/blob/main/client.go#L782>)
 
 ```go
 func (c *Client) GetAvailableSelfTests(ctx context.Context, devicePath string) (*SelfTestInfo, error)
@@ -358,7 +358,7 @@ func (c *Client) GetAvailableSelfTests(ctx context.Context, devicePath string) (
 GetAvailableSelfTests returns the list of available self\-test types and their durations for a device
 
 <a name="Client.GetAvailableSelfTestsFromInfo"></a>
-### func \(\*Client\) [GetAvailableSelfTestsFromInfo](<https://github.com/dianlight/smartmontools-sdk/bindings/go/blob/main/client.go#L829>)
+### func \(\*Client\) [GetAvailableSelfTestsFromInfo](<https://github.com/dianlight/smartmontools-sdk/bindings/go/v8/blob/main/client.go#L829>)
 
 ```go
 func (c *Client) GetAvailableSelfTestsFromInfo(smartInfo *SMARTInfo) *SelfTestInfo
@@ -385,7 +385,7 @@ for _, testType := range selfTests.Available {
 ```
 
 <a name="Client.GetDeviceInfo"></a>
-### func \(\*Client\) [GetDeviceInfo](<https://github.com/dianlight/smartmontools-sdk/bindings/go/blob/main/client.go#L568>)
+### func \(\*Client\) [GetDeviceInfo](<https://github.com/dianlight/smartmontools-sdk/bindings/go/v8/blob/main/client.go#L568>)
 
 ```go
 func (c *Client) GetDeviceInfo(ctx context.Context, devicePath string) (map[string]interface{}, error)
@@ -394,7 +394,7 @@ func (c *Client) GetDeviceInfo(ctx context.Context, devicePath string) (map[stri
 GetDeviceInfo retrieves basic device information
 
 <a name="Client.GetSMARTInfo"></a>
-### func \(\*Client\) [GetSMARTInfo](<https://github.com/dianlight/smartmontools-sdk/bindings/go/blob/main/client.go#L357>)
+### func \(\*Client\) [GetSMARTInfo](<https://github.com/dianlight/smartmontools-sdk/bindings/go/v8/blob/main/client.go#L357>)
 
 ```go
 func (c *Client) GetSMARTInfo(ctx context.Context, devicePath string) (*SMARTInfo, error)
@@ -403,7 +403,7 @@ func (c *Client) GetSMARTInfo(ctx context.Context, devicePath string) (*SMARTInf
 GetSMARTInfo retrieves SMART information for a device
 
 <a name="Client.GetSMARTSupportFromInfo"></a>
-### func \(\*Client\) [GetSMARTSupportFromInfo](<https://github.com/dianlight/smartmontools-sdk/bindings/go/blob/main/client.go#L871>)
+### func \(\*Client\) [GetSMARTSupportFromInfo](<https://github.com/dianlight/smartmontools-sdk/bindings/go/v8/blob/main/client.go#L871>)
 
 ```go
 func (c *Client) GetSMARTSupportFromInfo(smartInfo *SMARTInfo) *SmartSupport
@@ -440,7 +440,7 @@ if err != nil {
 ```
 
 <a name="Client.IsSMARTSupported"></a>
-### func \(\*Client\) [IsSMARTSupported](<https://github.com/dianlight/smartmontools-sdk/bindings/go/blob/main/client.go#L915>)
+### func \(\*Client\) [IsSMARTSupported](<https://github.com/dianlight/smartmontools-sdk/bindings/go/v8/blob/main/client.go#L915>)
 
 ```go
 func (c *Client) IsSMARTSupported(ctx context.Context, devicePath string) (*SmartSupport, error)
@@ -470,7 +470,7 @@ if !support.Enabled {
 Only use IsSMARTSupported for one\-off checks where disk access is acceptable.
 
 <a name="Client.RunSelfTest"></a>
-### func \(\*Client\) [RunSelfTest](<https://github.com/dianlight/smartmontools-sdk/bindings/go/blob/main/client.go#L589>)
+### func \(\*Client\) [RunSelfTest](<https://github.com/dianlight/smartmontools-sdk/bindings/go/v8/blob/main/client.go#L589>)
 
 ```go
 func (c *Client) RunSelfTest(ctx context.Context, devicePath string, testType string) error
@@ -479,7 +479,7 @@ func (c *Client) RunSelfTest(ctx context.Context, devicePath string, testType st
 RunSelfTest initiates a SMART self\-test
 
 <a name="Client.RunSelfTestWithProgress"></a>
-### func \(\*Client\) [RunSelfTestWithProgress](<https://github.com/dianlight/smartmontools-sdk/bindings/go/blob/main/client.go#L606>)
+### func \(\*Client\) [RunSelfTestWithProgress](<https://github.com/dianlight/smartmontools-sdk/bindings/go/v8/blob/main/client.go#L606>)
 
 ```go
 func (c *Client) RunSelfTestWithProgress(ctx context.Context, devicePath string, testType string, callback ProgressCallback) error
@@ -488,7 +488,7 @@ func (c *Client) RunSelfTestWithProgress(ctx context.Context, devicePath string,
 RunSelfTestWithProgress starts a SMART self\-test and reports progress
 
 <a name="Client.ScanDevices"></a>
-### func \(\*Client\) [ScanDevices](<https://github.com/dianlight/smartmontools-sdk/bindings/go/blob/main/client.go#L162>)
+### func \(\*Client\) [ScanDevices](<https://github.com/dianlight/smartmontools-sdk/bindings/go/v8/blob/main/client.go#L162>)
 
 ```go
 func (c *Client) ScanDevices(ctx context.Context) ([]Device, error)
@@ -497,7 +497,7 @@ func (c *Client) ScanDevices(ctx context.Context) ([]Device, error)
 ScanDevices scans for available storage devices. It first attempts \-\-scan\-open \(which performs an open on each drive to verify accessibility\) and falls back to \-\-scan on failure. \-\-scan\-open may fail in container sandboxes, on older kernels, or when the caller lacks the required permissions; \-\-scan still returns the device list without the open step.
 
 <a name="ClientOption"></a>
-## type [ClientOption](<https://github.com/dianlight/smartmontools-sdk/bindings/go/blob/main/client.go#L30>)
+## type [ClientOption](<https://github.com/dianlight/smartmontools-sdk/bindings/go/v8/blob/main/client.go#L30>)
 
 ClientOption is a function that configures a Client
 
@@ -506,7 +506,7 @@ type ClientOption func(*Client)
 ```
 
 <a name="WithCommander"></a>
-### func [WithCommander](<https://github.com/dianlight/smartmontools-sdk/bindings/go/blob/main/client.go#L54>)
+### func [WithCommander](<https://github.com/dianlight/smartmontools-sdk/bindings/go/v8/blob/main/client.go#L54>)
 
 ```go
 func WithCommander(commander Commander) ClientOption
@@ -515,7 +515,7 @@ func WithCommander(commander Commander) ClientOption
 WithCommander sets a custom commander for testing purposes
 
 <a name="WithContext"></a>
-### func [WithContext](<https://github.com/dianlight/smartmontools-sdk/bindings/go/blob/main/client.go#L62>)
+### func [WithContext](<https://github.com/dianlight/smartmontools-sdk/bindings/go/v8/blob/main/client.go#L62>)
 
 ```go
 func WithContext(ctx context.Context) ClientOption
@@ -524,7 +524,7 @@ func WithContext(ctx context.Context) ClientOption
 WithContext sets a default context to use when methods are called with nil context
 
 <a name="WithLogHandler"></a>
-### func [WithLogHandler](<https://github.com/dianlight/smartmontools-sdk/bindings/go/blob/main/client.go#L40>)
+### func [WithLogHandler](<https://github.com/dianlight/smartmontools-sdk/bindings/go/v8/blob/main/client.go#L40>)
 
 ```go
 func WithLogHandler(logger *slog.Logger) ClientOption
@@ -533,7 +533,7 @@ func WithLogHandler(logger *slog.Logger) ClientOption
 WithLogHandler sets a custom slog.Logger for the client.
 
 <a name="WithSmartctlPath"></a>
-### func [WithSmartctlPath](<https://github.com/dianlight/smartmontools-sdk/bindings/go/blob/main/client.go#L33>)
+### func [WithSmartctlPath](<https://github.com/dianlight/smartmontools-sdk/bindings/go/v8/blob/main/client.go#L33>)
 
 ```go
 func WithSmartctlPath(path string) ClientOption
@@ -542,7 +542,7 @@ func WithSmartctlPath(path string) ClientOption
 WithSmartctlPath sets a custom path to the smartctl binary
 
 <a name="WithTLogHandler"></a>
-### func [WithTLogHandler](<https://github.com/dianlight/smartmontools-sdk/bindings/go/blob/main/client.go#L47>)
+### func [WithTLogHandler](<https://github.com/dianlight/smartmontools-sdk/bindings/go/v8/blob/main/client.go#L47>)
 
 ```go
 func WithTLogHandler(logger *tlog.Logger) ClientOption
@@ -551,7 +551,7 @@ func WithTLogHandler(logger *tlog.Logger) ClientOption
 WithTLogHandler sets a custom tlog.Logger for the client.
 
 <a name="Cmd"></a>
-## type [Cmd](<https://github.com/dianlight/smartmontools-sdk/bindings/go/blob/main/commander.go#L14-L18>)
+## type [Cmd](<https://github.com/dianlight/smartmontools-sdk/bindings/go/v8/blob/main/commander.go#L14-L18>)
 
 Cmd interface for command execution
 
@@ -564,7 +564,7 @@ type Cmd interface {
 ```
 
 <a name="Commander"></a>
-## type [Commander](<https://github.com/dianlight/smartmontools-sdk/bindings/go/blob/main/commander.go#L9-L11>)
+## type [Commander](<https://github.com/dianlight/smartmontools-sdk/bindings/go/v8/blob/main/commander.go#L9-L11>)
 
 Commander interface for executing commands
 
@@ -575,7 +575,7 @@ type Commander interface {
 ```
 
 <a name="Device"></a>
-## type [Device](<https://github.com/dianlight/smartmontools-sdk/bindings/go/blob/main/types.go#L8-L11>)
+## type [Device](<https://github.com/dianlight/smartmontools-sdk/bindings/go/v8/blob/main/types.go#L8-L11>)
 
 Device represents a storage device
 
@@ -587,7 +587,7 @@ type Device struct {
 ```
 
 <a name="DiscoveryResult"></a>
-## type [DiscoveryResult](<https://github.com/dianlight/smartmontools-sdk/bindings/go/blob/main/types.go#L264-L285>)
+## type [DiscoveryResult](<https://github.com/dianlight/smartmontools-sdk/bindings/go/v8/blob/main/types.go#L264-L285>)
 
 DiscoveryResult holds the outcome of probing a single device during DiscoverDevices. It reports whether SMART data was readable with the auto\-detected protocol and whether a SAT fallback was required.
 
@@ -617,7 +617,7 @@ type DiscoveryResult struct {
 ```
 
 <a name="ExitCodeInfo"></a>
-## type [ExitCodeInfo](<https://github.com/dianlight/smartmontools-sdk/bindings/go/blob/main/types.go#L248-L259>)
+## type [ExitCodeInfo](<https://github.com/dianlight/smartmontools-sdk/bindings/go/v8/blob/main/types.go#L248-L259>)
 
 ExitCodeInfo breaks down the smartctl exit status into semantic groups.
 
@@ -653,7 +653,7 @@ type ExitCodeInfo struct {
 ```
 
 <a name="Flags"></a>
-## type [Flags](<https://github.com/dianlight/smartmontools-sdk/bindings/go/blob/main/types.go#L190-L199>)
+## type [Flags](<https://github.com/dianlight/smartmontools-sdk/bindings/go/v8/blob/main/types.go#L190-L199>)
 
 Flags represents attribute flags
 
@@ -671,7 +671,7 @@ type Flags struct {
 ```
 
 <a name="Message"></a>
-## type [Message](<https://github.com/dianlight/smartmontools-sdk/bindings/go/blob/main/types.go#L218-L221>)
+## type [Message](<https://github.com/dianlight/smartmontools-sdk/bindings/go/v8/blob/main/types.go#L218-L221>)
 
 Message represents a message from smartctl
 
@@ -683,7 +683,7 @@ type Message struct {
 ```
 
 <a name="NvmeControllerCapabilities"></a>
-## type [NvmeControllerCapabilities](<https://github.com/dianlight/smartmontools-sdk/bindings/go/blob/main/types.go#L14-L16>)
+## type [NvmeControllerCapabilities](<https://github.com/dianlight/smartmontools-sdk/bindings/go/v8/blob/main/types.go#L14-L16>)
 
 NvmeControllerCapabilities represents NVMe controller capabilities
 
@@ -694,7 +694,7 @@ type NvmeControllerCapabilities struct {
 ```
 
 <a name="NvmeOptionalAdminCommands"></a>
-## type [NvmeOptionalAdminCommands](<https://github.com/dianlight/smartmontools-sdk/bindings/go/blob/main/types.go#L166-L168>)
+## type [NvmeOptionalAdminCommands](<https://github.com/dianlight/smartmontools-sdk/bindings/go/v8/blob/main/types.go#L166-L168>)
 
 NvmeOptionalAdminCommands represents NVMe optional admin commands
 
@@ -705,7 +705,7 @@ type NvmeOptionalAdminCommands struct {
 ```
 
 <a name="NvmeSmartHealth"></a>
-## type [NvmeSmartHealth](<https://github.com/dianlight/smartmontools-sdk/bindings/go/blob/main/types.go#L19-L38>)
+## type [NvmeSmartHealth](<https://github.com/dianlight/smartmontools-sdk/bindings/go/v8/blob/main/types.go#L19-L38>)
 
 NvmeSmartHealth represents NVMe SMART health information
 
@@ -733,7 +733,7 @@ type NvmeSmartHealth struct {
 ```
 
 <a name="NvmeSmartTestLog"></a>
-## type [NvmeSmartTestLog](<https://github.com/dianlight/smartmontools-sdk/bindings/go/blob/main/types.go#L40-L43>)
+## type [NvmeSmartTestLog](<https://github.com/dianlight/smartmontools-sdk/bindings/go/v8/blob/main/types.go#L40-L43>)
 
 
 
@@ -745,7 +745,7 @@ type NvmeSmartTestLog struct {
 ```
 
 <a name="OfflineDataCollection"></a>
-## type [OfflineDataCollection](<https://github.com/dianlight/smartmontools-sdk/bindings/go/blob/main/types.go#L133-L136>)
+## type [OfflineDataCollection](<https://github.com/dianlight/smartmontools-sdk/bindings/go/v8/blob/main/types.go#L133-L136>)
 
 OfflineDataCollection represents offline data collection status
 
@@ -757,7 +757,7 @@ type OfflineDataCollection struct {
 ```
 
 <a name="PollingMinutes"></a>
-## type [PollingMinutes](<https://github.com/dianlight/smartmontools-sdk/bindings/go/blob/main/types.go#L139-L143>)
+## type [PollingMinutes](<https://github.com/dianlight/smartmontools-sdk/bindings/go/v8/blob/main/types.go#L139-L143>)
 
 PollingMinutes represents polling minutes for different test types
 
@@ -770,7 +770,7 @@ type PollingMinutes struct {
 ```
 
 <a name="PowerOnTime"></a>
-## type [PowerOnTime](<https://github.com/dianlight/smartmontools-sdk/bindings/go/blob/main/types.go#L213-L215>)
+## type [PowerOnTime](<https://github.com/dianlight/smartmontools-sdk/bindings/go/v8/blob/main/types.go#L213-L215>)
 
 PowerOnTime represents power on time
 
@@ -781,7 +781,7 @@ type PowerOnTime struct {
 ```
 
 <a name="ProgressCallback"></a>
-## type [ProgressCallback](<https://github.com/dianlight/smartmontools-sdk/bindings/go/blob/main/types.go#L231>)
+## type [ProgressCallback](<https://github.com/dianlight/smartmontools-sdk/bindings/go/v8/blob/main/types.go#L231>)
 
 ProgressCallback is a function type for reporting progress
 
@@ -790,7 +790,7 @@ type ProgressCallback func(progress int, status string)
 ```
 
 <a name="Raw"></a>
-## type [Raw](<https://github.com/dianlight/smartmontools-sdk/bindings/go/blob/main/types.go#L202-L205>)
+## type [Raw](<https://github.com/dianlight/smartmontools-sdk/bindings/go/v8/blob/main/types.go#L202-L205>)
 
 Raw represents raw attribute value
 
@@ -802,7 +802,7 @@ type Raw struct {
 ```
 
 <a name="SMARTInfo"></a>
-## type [SMARTInfo](<https://github.com/dianlight/smartmontools-sdk/bindings/go/blob/main/types.go#L52-L73>)
+## type [SMARTInfo](<https://github.com/dianlight/smartmontools-sdk/bindings/go/v8/blob/main/types.go#L52-L73>)
 
 SMARTInfo represents comprehensive SMART information for a storage device
 
@@ -832,7 +832,7 @@ type SMARTInfo struct {
 ```
 
 <a name="SMARTInfo.WearLevelPercent"></a>
-### func \(\*SMARTInfo\) [WearLevelPercent](<https://github.com/dianlight/smartmontools-sdk/bindings/go/blob/main/types.go#L300>)
+### func \(\*SMARTInfo\) [WearLevelPercent](<https://github.com/dianlight/smartmontools-sdk/bindings/go/v8/blob/main/types.go#L300>)
 
 ```go
 func (s *SMARTInfo) WearLevelPercent() *int
@@ -849,7 +849,7 @@ The source depends on the drive type \(SMARTInfo.DiskType\):
 The returned value is always clamped to \[0, 100\].
 
 <a name="SelfTest"></a>
-## type [SelfTest](<https://github.com/dianlight/smartmontools-sdk/bindings/go/blob/main/types.go#L146-L149>)
+## type [SelfTest](<https://github.com/dianlight/smartmontools-sdk/bindings/go/v8/blob/main/types.go#L146-L149>)
 
 SelfTest represents self\-test information
 
@@ -861,7 +861,7 @@ type SelfTest struct {
 ```
 
 <a name="SelfTestInfo"></a>
-## type [SelfTestInfo](<https://github.com/dianlight/smartmontools-sdk/bindings/go/blob/main/types.go#L160-L163>)
+## type [SelfTestInfo](<https://github.com/dianlight/smartmontools-sdk/bindings/go/v8/blob/main/types.go#L160-L163>)
 
 SelfTestInfo represents available self\-tests and their durations
 
@@ -873,7 +873,7 @@ type SelfTestInfo struct {
 ```
 
 <a name="SmartAttribute"></a>
-## type [SmartAttribute](<https://github.com/dianlight/smartmontools-sdk/bindings/go/blob/main/types.go#L178-L187>)
+## type [SmartAttribute](<https://github.com/dianlight/smartmontools-sdk/bindings/go/v8/blob/main/types.go#L178-L187>)
 
 SmartAttribute represents a single SMART attribute
 
@@ -891,7 +891,7 @@ type SmartAttribute struct {
 ```
 
 <a name="SmartClient"></a>
-## type [SmartClient](<https://github.com/dianlight/smartmontools-sdk/bindings/go/blob/main/client.go#L83-L98>)
+## type [SmartClient](<https://github.com/dianlight/smartmontools-sdk/bindings/go/v8/blob/main/client.go#L83-L98>)
 
 SmartClient interface defines the methods for interacting with smartmontools
 
@@ -915,7 +915,7 @@ type SmartClient interface {
 ```
 
 <a name="NewClient"></a>
-### func [NewClient](<https://github.com/dianlight/smartmontools-sdk/bindings/go/blob/main/client.go#L118>)
+### func [NewClient](<https://github.com/dianlight/smartmontools-sdk/bindings/go/v8/blob/main/client.go#L118>)
 
 ```go
 func NewClient(opts ...ClientOption) (SmartClient, error)
@@ -924,7 +924,7 @@ func NewClient(opts ...ClientOption) (SmartClient, error)
 NewClient creates a new smartmontools client with optional configuration. If no smartctl path is provided, it will search for smartctl in PATH. If no log handler is provided, it will use a tlog debug\-level logger for diagnostic output. If no context is provided, context.Background\(\) will be used as the default. The device type cache is pre\-populated with drivedb entries on initialization.
 
 <a name="SmartStatus"></a>
-## type [SmartStatus](<https://github.com/dianlight/smartmontools-sdk/bindings/go/blob/main/types.go#L76-L81>)
+## type [SmartStatus](<https://github.com/dianlight/smartmontools-sdk/bindings/go/v8/blob/main/types.go#L76-L81>)
 
 SmartStatus represents the overall SMART health status
 
@@ -938,7 +938,7 @@ type SmartStatus struct {
 ```
 
 <a name="SmartSupport"></a>
-## type [SmartSupport](<https://github.com/dianlight/smartmontools-sdk/bindings/go/blob/main/types.go#L84-L87>)
+## type [SmartSupport](<https://github.com/dianlight/smartmontools-sdk/bindings/go/v8/blob/main/types.go#L84-L87>)
 
 SmartSupport represents SMART availability and enablement status.
 
@@ -950,7 +950,7 @@ type SmartSupport struct {
 ```
 
 <a name="SmartctlInfo"></a>
-## type [SmartctlInfo](<https://github.com/dianlight/smartmontools-sdk/bindings/go/blob/main/types.go#L224-L228>)
+## type [SmartctlInfo](<https://github.com/dianlight/smartmontools-sdk/bindings/go/v8/blob/main/types.go#L224-L228>)
 
 SmartctlInfo represents smartctl metadata and messages
 
@@ -963,7 +963,7 @@ type SmartctlInfo struct {
 ```
 
 <a name="StatusField"></a>
-## type [StatusField](<https://github.com/dianlight/smartmontools-sdk/bindings/go/blob/main/types.go#L98-L103>)
+## type [StatusField](<https://github.com/dianlight/smartmontools-sdk/bindings/go/v8/blob/main/types.go#L98-L103>)
 
 StatusField represents a status field that can be either a simple string or a complex object
 
@@ -977,7 +977,7 @@ type StatusField struct {
 ```
 
 <a name="StatusField.UnmarshalJSON"></a>
-### func \(\*StatusField\) [UnmarshalJSON](<https://github.com/dianlight/smartmontools-sdk/bindings/go/blob/main/types.go#L107>)
+### func \(\*StatusField\) [UnmarshalJSON](<https://github.com/dianlight/smartmontools-sdk/bindings/go/v8/blob/main/types.go#L107>)
 
 ```go
 func (s *StatusField) UnmarshalJSON(data []byte) error
@@ -986,7 +986,7 @@ func (s *StatusField) UnmarshalJSON(data []byte) error
 UnmarshalJSON allows StatusField to be parsed from either a JSON string \(e.g., "completed"\) or a structured object with fields \{value, string, passed, remaining\_percent\}.
 
 <a name="Temperature"></a>
-## type [Temperature](<https://github.com/dianlight/smartmontools-sdk/bindings/go/blob/main/types.go#L208-L210>)
+## type [Temperature](<https://github.com/dianlight/smartmontools-sdk/bindings/go/v8/blob/main/types.go#L208-L210>)
 
 Temperature represents device temperature
 
@@ -997,7 +997,7 @@ type Temperature struct {
 ```
 
 <a name="UserCapacity"></a>
-## type [UserCapacity](<https://github.com/dianlight/smartmontools-sdk/bindings/go/blob/main/types.go#L46-L49>)
+## type [UserCapacity](<https://github.com/dianlight/smartmontools-sdk/bindings/go/v8/blob/main/types.go#L46-L49>)
 
 UserCapacity represents storage device capacity information
 

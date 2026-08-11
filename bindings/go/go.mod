@@ -1,4 +1,4 @@
-module github.com/dianlight/smartmontools-sdk/bindings/go
+module github.com/dianlight/smartmontools-sdk/bindings/go/v8
 
 go 1.26
 

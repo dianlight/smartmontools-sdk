@@ -5,7 +5,7 @@ package smartmontools
 import (
 	"log/slog"
 
-	smcompare "github.com/dianlight/smartmontools-sdk/bindings/go/backends/compare"
+	smcompare "github.com/dianlight/smartmontools-sdk/bindings/go/v8/backends/compare"
 	"github.com/dianlight/tlog"
 )
 

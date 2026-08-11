@@ -48,10 +48,10 @@ import (
 	"fmt"
 	"os"
 
-	smartmontools "github.com/dianlight/smartmontools-sdk/bindings/go"
-	comparebackend "github.com/dianlight/smartmontools-sdk/bindings/go/backends/compare"
-	execbackend "github.com/dianlight/smartmontools-sdk/bindings/go/backends/exec"
-	libbackend "github.com/dianlight/smartmontools-sdk/bindings/go/backends/lib"
+	smartmontools "github.com/dianlight/smartmontools-sdk/bindings/go/v8"
+	comparebackend "github.com/dianlight/smartmontools-sdk/bindings/go/v8/backends/compare"
+	execbackend "github.com/dianlight/smartmontools-sdk/bindings/go/v8/backends/exec"
+	libbackend "github.com/dianlight/smartmontools-sdk/bindings/go/v8/backends/lib"
 	"github.com/dianlight/tlog"
 	"github.com/fatih/color"
 )

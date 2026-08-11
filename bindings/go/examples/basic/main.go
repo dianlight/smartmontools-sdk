@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dianlight/smartmontools-sdk/bindings/go"
+	"github.com/dianlight/smartmontools-sdk/bindings/go/v8"
 	"github.com/dianlight/tlog"
 	"github.com/fatih/color"
 )

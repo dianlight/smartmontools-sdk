@@ -5,12 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [bindings/go/v0.5.0] — Unreleased
+## [bindings/go/v8.0.0] — Unreleased
+
+This module has never been published under any version — the `v0.5.0` heading
+this replaces was aspirational, not a real release (`git tag -l 'bindings/go/*'`
+is empty). That made it free to adopt the core's versioning scheme outright
+instead of continuing a Go-only `v0.x` line.
 
 ### Breaking Changes
 - **Module path change**: this module moved from the standalone `smartmontools-go`
   repository into the `smartmontools-sdk` monorepo, at `bindings/go/`. The module
-  path is now `github.com/dianlight/smartmontools-sdk/bindings/go`. Consumers must
+  path is now `github.com/dianlight/smartmontools-sdk/bindings/go/v8`. Consumers must
   update all import paths; see
   [docs/migration/import-path-migration.md](../../docs/migration/import-path-migration.md).
 - **Relicensed from GPL-3.0-only to GPL-2.0-or-later**, matching the license of the
@@ -19,6 +24,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Tagging scheme change**: releases are now tagged `bindings/go/vX.Y.Z` instead of
   a bare `vX.Y.Z`, since the tag namespace is shared with the native core's
   `vX.Y.Z` releases in the same monorepo.
+- **Version numbering now mirrors the native core.** A core release always
+  produces a paired bindings release at the identical version — even with zero
+  Go source changes — via `release-core.yml`'s `dispatch-bindings` job. The
+  `/v8` suffix will move to `/v9` on the core's next major bump; see
+  [docs/development/release-process.md](../../docs/development/release-process.md).
 
 ### Added
 - `smartmon_abi_version()` ABI-version check in `LibBackend.New`: refuses to load a
@@ -144,20 +154,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [v0.2.7] — 2025-04-16
 
-See [GitHub release](https://github.com/dianlight/smartmontools-sdk/bindings/go/releases/tag/v0.2.7).
+See [GitHub release](https://github.com/dianlight/smartmontools-sdk/bindings/go/v8/releases/tag/v0.2.7).
 
 ## [v0.2.6] — 2025-04-07
 
-See [GitHub release](https://github.com/dianlight/smartmontools-sdk/bindings/go/releases/tag/v0.2.6).
+See [GitHub release](https://github.com/dianlight/smartmontools-sdk/bindings/go/v8/releases/tag/v0.2.6).
 
 ## [v0.2.5] — 2025-03-28
 
-See [GitHub release](https://github.com/dianlight/smartmontools-sdk/bindings/go/releases/tag/v0.2.5).
+See [GitHub release](https://github.com/dianlight/smartmontools-sdk/bindings/go/v8/releases/tag/v0.2.5).
 
 ## [v0.2.4] — 2025-03-21
 
-See [GitHub release](https://github.com/dianlight/smartmontools-sdk/bindings/go/releases/tag/v0.2.4).
+See [GitHub release](https://github.com/dianlight/smartmontools-sdk/bindings/go/v8/releases/tag/v0.2.4).
 
 ## [v0.2.3] — 2025-03-14
 
-See [GitHub release](https://github.com/dianlight/smartmontools-sdk/bindings/go/releases/tag/v0.2.3).
+See [GitHub release](https://github.com/dianlight/smartmontools-sdk/bindings/go/v8/releases/tag/v0.2.3).

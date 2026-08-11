@@ -29,12 +29,12 @@ backends can be supplied with WithBackend.
 # Backend Layout
 
 The default smartctl-backed implementation lives in
-github.com/dianlight/smartmontools-sdk/bindings/go/backends/exec. Shared types and
-interfaces live in github.com/dianlight/smartmontools-sdk/bindings/go/types; the root
+github.com/dianlight/smartmontools-sdk/bindings/go/v8/backends/exec. Shared types and
+interfaces live in github.com/dianlight/smartmontools-sdk/bindings/go/v8/types; the root
 package re-exports them as type aliases for a flat, ergonomic API surface.
 
 An alternative purego FFI backend lives in
-github.com/dianlight/smartmontools-sdk/bindings/go/backends/lib (LibBackend). It loads
+github.com/dianlight/smartmontools-sdk/bindings/go/v8/backends/lib (LibBackend). It loads
 a smartmon wrapper shared library at runtime using ebitengine/purego,
 avoiding process-spawn overhead and the smartctl binary dependency.
 

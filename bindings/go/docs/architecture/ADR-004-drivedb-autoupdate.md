@@ -244,7 +244,7 @@ amendment.
 The tradeoff is explicit: `drivedb.h` (~290 KB) is duplicated in git between
 `native/` and `bindings/go/`. `go:embed` cannot reach outside its module
 directory, and a consumer running `go get
-github.com/dianlight/smartmontools-sdk/bindings/go` receives only the
+github.com/dianlight/smartmontools-sdk/bindings/go/v8` receives only the
 `bindings/go/` subtree — there is no `native/` in the module zip. A physical
 copy is therefore required for the module to build at all, not merely
 convenient; the CI drift check is what keeps "single source of truth"

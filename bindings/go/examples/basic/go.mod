@@ -2,10 +2,10 @@ module example
 
 go 1.26.0
 
-replace github.com/dianlight/smartmontools-sdk/bindings/go => ../..
+replace github.com/dianlight/smartmontools-sdk/bindings/go/v8 => ../..
 
 require (
-	github.com/dianlight/smartmontools-sdk/bindings/go v0.0.0-00010101000000-000000000000
+	github.com/dianlight/smartmontools-sdk/bindings/go/v8 v8.0.0-00010101000000-000000000000
 	github.com/dianlight/tlog v0.2.2
 	github.com/fatih/color v1.18.0
 )

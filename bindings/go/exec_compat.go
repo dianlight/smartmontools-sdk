@@ -5,7 +5,7 @@ package smartmontools
 import (
 	"log/slog"
 
-	smexec "github.com/dianlight/smartmontools-sdk/bindings/go/backends/exec"
+	smexec "github.com/dianlight/smartmontools-sdk/bindings/go/v8/backends/exec"
 	"github.com/dianlight/tlog"
 )
 

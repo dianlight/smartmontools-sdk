@@ -36,8 +36,8 @@ import (
 	"github.com/dianlight/tlog"
 	"github.com/fatih/color"
 
-	smartmontools "github.com/dianlight/smartmontools-sdk/bindings/go"
-	libbackend "github.com/dianlight/smartmontools-sdk/bindings/go/backends/lib"
+	smartmontools "github.com/dianlight/smartmontools-sdk/bindings/go/v8"
+	libbackend "github.com/dianlight/smartmontools-sdk/bindings/go/v8/backends/lib"
 )
 
 func main() {
