@@ -9,7 +9,7 @@ only what's specific to how the binding fits into the monorepo.
 ## Install
 
 ```bash
-go get github.com/dianlight/smartmontools-sdk/bindings/go
+go get github.com/dianlight/smartmontools-sdk/bindings/go/v8
 ```
 
 The module path includes `bindings/go` because Go's module system resolves a

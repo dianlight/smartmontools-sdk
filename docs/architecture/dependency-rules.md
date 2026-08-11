@@ -80,9 +80,15 @@ until they crash. See [abi-contract.md](abi-contract.md) for the full policy.
 
 - `native/capi/` can gain new symbols (minor bump) without touching a single
   binding.
-- `bindings/go/` can release on its own schedule (`bindings/go/vX.Y.Z`)
-  independent of `native/`'s release cadence (`vX.Y.Z`), because the ABI
-  version check — not a shared git tag — is what a binding actually trusts
-  at runtime.
+- The runtime contract is the ABI check, not the release cascade. Since
+  `release-core.yml` now always tags a paired `bindings/go/vX.Y.Z` on every
+  core release (see
+  [../development/release-process.md](../development/release-process.md)),
+  `native/` and `bindings/go/` share a release *version* — but a binding still
+  only trusts `smartmon_abi_version()` at load time, never the tag it shipped
+  under. A binding built against an older `native/capi/` keeps working against
+  a newer wrapper as long as the ABI major matches and the minor is `>=`,
+  regardless of how far the two version numbers have since diverged in a
+  fork or a vendored copy.
 - A future `bindings/python/` or `bindings/rust/` depends on `native/capi/`
   exactly the same way `bindings/go/` does, with no dependency on Go at all.

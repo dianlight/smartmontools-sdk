@@ -23,7 +23,7 @@ the full rationale.
 | Old (`smartmontools-go`) | New (`smartmontools-sdk`) |
 |---|---|
 | Repository root | `bindings/go/` |
-| `go.mod` module path `github.com/dianlight/smartmontools-go` | `github.com/dianlight/smartmontools-sdk/bindings/go` |
+| `go.mod` module path `github.com/dianlight/smartmontools-go` | `github.com/dianlight/smartmontools-sdk/bindings/go/v8` |
 | Bare `vX.Y.Z` tags | `bindings/go/vX.Y.Z` tags |
 | `LICENSE` (GPL-3.0-only) | Relicensed to GPL-2.0-or-later; see root [`COPYING`](../../COPYING) |
 | `backends/lib/`'s `smartmon_c_api.{cpp,h}` fetched cross-repo from a pinned `smartmontools-go` tag | `native/capi/smartmon_c_api.{cpp,h}`, built in-tree |

@@ -5,12 +5,12 @@ as `bindings/go/`:
 
 | Old | New |
 |---|---|
-| `github.com/dianlight/smartmontools-go` | `github.com/dianlight/smartmontools-sdk/bindings/go` |
-| `github.com/dianlight/smartmontools-go/types` | `github.com/dianlight/smartmontools-sdk/bindings/go/types` |
-| `github.com/dianlight/smartmontools-go/backends/exec` | `github.com/dianlight/smartmontools-sdk/bindings/go/backends/exec` |
-| `github.com/dianlight/smartmontools-go/backends/lib` | `github.com/dianlight/smartmontools-sdk/bindings/go/backends/lib` |
-| `github.com/dianlight/smartmontools-go/backends/shadow` | `github.com/dianlight/smartmontools-sdk/bindings/go/backends/shadow` |
-| `github.com/dianlight/smartmontools-go/backends/compare` | `github.com/dianlight/smartmontools-sdk/bindings/go/backends/compare` |
+| `github.com/dianlight/smartmontools-go` | `github.com/dianlight/smartmontools-sdk/bindings/go/v8` |
+| `github.com/dianlight/smartmontools-go/types` | `github.com/dianlight/smartmontools-sdk/bindings/go/v8/types` |
+| `github.com/dianlight/smartmontools-go/backends/exec` | `github.com/dianlight/smartmontools-sdk/bindings/go/v8/backends/exec` |
+| `github.com/dianlight/smartmontools-go/backends/lib` | `github.com/dianlight/smartmontools-sdk/bindings/go/v8/backends/lib` |
+| `github.com/dianlight/smartmontools-go/backends/shadow` | `github.com/dianlight/smartmontools-sdk/bindings/go/v8/backends/shadow` |
+| `github.com/dianlight/smartmontools-go/backends/compare` | `github.com/dianlight/smartmontools-sdk/bindings/go/v8/backends/compare` |
 
 Every subpackage moved as a unit — only the module prefix changed, nothing
 was renamed or restructured within the tree.
@@ -19,8 +19,14 @@ was renamed or restructured within the tree.
 
 ```
 - require github.com/dianlight/smartmontools-go v0.4.1
-+ require github.com/dianlight/smartmontools-sdk/bindings/go v0.5.0
++ require github.com/dianlight/smartmontools-sdk/bindings/go/v8 v8.0.0
 ```
+
+There is no intermediate `v0.5.0` step to migrate through: that version was
+never actually tagged (`git tag -l 'bindings/go/*'` is empty before this
+scheme), so the first real release of this module is `bindings/go/v8.0.0`,
+matching the native core's version under the release cascade described in
+[../development/release-process.md](../development/release-process.md).
 
 Tag prefix also changed: the old repository tagged bare `vX.Y.Z`; the new
 module is tagged `bindings/go/vX.Y.Z` (required by Go's module-in-subdirectory
@@ -32,13 +38,13 @@ A plain `sed` across your Go sources handles the common case:
 
 ```bash
 grep -rl 'github.com/dianlight/smartmontools-go' --include='*.go' . | \
-  xargs sed -i 's#github.com/dianlight/smartmontools-go#github.com/dianlight/smartmontools-sdk/bindings/go#g'
+  xargs sed -i 's#github.com/dianlight/smartmontools-go#github.com/dianlight/smartmontools-sdk/bindings/go/v8#g'
 ```
 
 On macOS, `sed -i` needs an explicit (empty) backup extension:
 
 ```bash
-xargs sed -i '' 's#github.com/dianlight/smartmontools-go#github.com/dianlight/smartmontools-sdk/bindings/go#g'
+xargs sed -i '' 's#github.com/dianlight/smartmontools-go#github.com/dianlight/smartmontools-sdk/bindings/go/v8#g'
 ```
 
 Then update `go.mod`/`go.sum` and re-run `gofmt` to fix import grouping,
