@@ -1,0 +1,139 @@
+name: Tag core release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Print the computed tag and gate verdict without tagging, pushing, or dispatching a release.'
+        required: false
+        type: boolean
+        default: true
+      force:
+        description: 'Bypass the artifact-changed gate (scripts/core-artifact-changed.sh) and tag/release even if nothing in the native-core build artifact changed.'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  actions: write
+  issues: write
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+          submodules: false
+
+      - name: Guard — only proceed for a qualifying automation PR merge, or an explicit dispatch
+        id: guard
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "proceed=true" >> "$GITHUB_OUTPUT"
+            echo "Explicit dispatch — proceeding."
+            exit 0
+          fi
+
+          # A push to main can be anything (docs, CI tweaks, unrelated PRs).
+          # Only an update-smartmontools-* or update-drivedb automation PR
+          # merge is a candidate release trigger; everything else is a no-op
+          # here by design, so most merges to main exit this job immediately
+          # without touching the gate or opening any issue.
+          HEAD_REF="$(gh api "repos/${{ github.repository }}/commits/${{ github.sha }}/pulls" --jq '.[0].head.ref // empty')"
+
+          if [[ "${HEAD_REF}" == update-smartmontools-* ]] || [ "${HEAD_REF}" = "update-drivedb" ]; then
+            echo "proceed=true" >> "$GITHUB_OUTPUT"
+            echo "Merge of automation PR (head: ${HEAD_REF}) — proceeding."
+          else
+            echo "proceed=false" >> "$GITHUB_OUTPUT"
+            echo "Not an automation-PR merge (head: ${HEAD_REF:-none}) — nothing to do."
+          fi
+
+      - name: Compute version and gate verdict
+        if: steps.guard.outputs.proceed == 'true'
+        id: version
+        run: |
+          VERSION="$(scripts/next-core-version.sh)"
+          PREV="$(scripts/next-core-version.sh --current)"
+
+          if [ -z "${PREV}" ]; then
+            # First release for this AC_INIT generation — nothing to diff
+            # against, and the AC_INIT bump itself is the change.
+            GATE_PASS="true"
+            CHANGED_PATHS="(first release for this AC_INIT generation)"
+          elif scripts/core-artifact-changed.sh "${PREV}"; then
+            GATE_PASS="true"
+            CHANGED_PATHS="$(scripts/core-artifact-changed.sh --list "${PREV}")"
+          else
+            GATE_PASS="false"
+            CHANGED_PATHS=""
+          fi
+
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "prev=${PREV}" >> "$GITHUB_OUTPUT"
+          echo "gate_pass=${GATE_PASS}" >> "$GITHUB_OUTPUT"
+          {
+            echo "changed_paths<<EOF"
+            echo "${CHANGED_PATHS}"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+          echo "Computed: version=${VERSION} prev=${PREV:-<none>} gate_pass=${GATE_PASS}"
+
+      - name: Dry-run summary
+        if: steps.guard.outputs.proceed == 'true' && github.event.inputs.dry_run == 'true'
+        run: |
+          echo "[dry-run] would tag: ${{ steps.version.outputs.version }}"
+          echo "[dry-run] previous tag: ${{ steps.version.outputs.prev }}"
+          echo "[dry-run] gate_pass: ${{ steps.version.outputs.gate_pass }} (force: ${{ github.event.inputs.force }})"
+          echo "[dry-run] changed paths:"
+          echo "${{ steps.version.outputs.changed_paths }}"
+          echo "[dry-run] would run: git tag ${{ steps.version.outputs.version }} && git push origin ${{ steps.version.outputs.version }}"
+          echo "[dry-run] would run: gh workflow run release-core.yml --ref main -f version=${{ steps.version.outputs.version }} -f dry_run=false"
+
+      - name: Open or update gate-failure tracking issue
+        if: steps.guard.outputs.proceed == 'true' && steps.version.outputs.gate_pass == 'false' && github.event.inputs.force != 'true' && github.event.inputs.dry_run != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TITLE="Core release gate: no artifact changes detected for ${{ steps.version.outputs.version }}"
+          BODY="The merge at ${{ github.sha }} did not change any path that participates in the native-core build artifact (see \`scripts/core-artifact-changed.sh\`), so no \`${{ steps.version.outputs.version }}\` tag or release was created.
+
+          This is expected for a gitlink-only submodule bump or a merge that only touched non-artifact paths. If a release is genuinely needed anyway, re-run this workflow via \`workflow_dispatch\` with \`force: true\`.
+
+          Previous release for this generation: \`${{ steps.version.outputs.prev }}\`"
+
+          EXISTING=$(gh issue list --search "in:title \"${TITLE}\"" --state open --json number --jq '.[0].number // empty')
+          if [ -n "${EXISTING}" ]; then
+            gh issue comment "${EXISTING}" --body "${BODY}"
+          else
+            gh issue create --title "${TITLE}" --body "${BODY}" --label "release-gate"
+          fi
+
+      - name: Tag and dispatch release
+        if: steps.guard.outputs.proceed == 'true' && (steps.version.outputs.gate_pass == 'true' || github.event.inputs.force == 'true') && github.event.inputs.dry_run != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag "${VERSION}"
+          git push origin "${VERSION}"
+
+          # Pushing with GITHUB_TOKEN does not fire release-core.yml's
+          # on:push:tags trigger (GitHub suppresses recursive Actions-authored
+          # events), so this workflow dispatches it explicitly instead.
+          gh workflow run release-core.yml \
+            --repo "${{ github.repository }}" \
+            --ref main \
+            -f version="${VERSION#v}" \
+            -f dry_run=false

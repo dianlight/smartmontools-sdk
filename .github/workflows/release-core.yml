@@ -1,0 +1,336 @@
+name: Release (native core)
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: >-
+          Core version to release (e.g. 8.0.0). Leave empty to re-publish the
+          newest existing tag for the current AC_INIT generation (see
+          scripts/next-core-version.sh --current).
+        required: false
+        type: string
+      dry_run:
+        description: 'Print what would happen without publishing a release or dispatching bindings.'
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      acinit: ${{ steps.version.outputs.acinit }}
+      dry_run: ${{ steps.version.outputs.dry_run }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Determine version
+        id: version
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+            VERSION="${VERSION#v}"
+          elif [ "${{ github.event_name }}" = "push" ]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          else
+            # workflow_dispatch with no explicit version: re-publish the
+            # newest tag for the *current* AC_INIT generation only. This is
+            # the fix for the v7.5 republish bug — the old fallback
+            # (`git ls-remote --tags 'v*' | head -n1`) picked the newest tag
+            # across all generations, which could resurrect a stale one.
+            CURRENT_TAG="$(scripts/next-core-version.sh --current)"
+            if [ -z "${CURRENT_TAG}" ]; then
+              echo "::error::no existing release for the current AC_INIT generation, and no 'version' input was given. Pass 'version' explicitly (e.g. 8.0.0) to cut the first release." >&2
+              exit 1
+            fi
+            VERSION="${CURRENT_TAG#v}"
+          fi
+
+          ACINIT="$(scripts/next-core-version.sh --acinit)"
+
+          DRY_RUN="false"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            DRY_RUN="${{ github.event.inputs.dry_run }}"
+          fi
+
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "acinit=${ACINIT}" >> "$GITHUB_OUTPUT"
+          echo "dry_run=${DRY_RUN}" >> "$GITHUB_OUTPUT"
+          echo "Releasing native core version: ${VERSION} (AC_INIT ${ACINIT}, dry_run=${DRY_RUN})"
+
+  build:
+    needs: prepare
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: linux-amd64
+            host: x86_64-linux-gnu
+            cc: gcc
+            cxx: g++
+            cflags: ""
+            cxxflags: ""
+            deps: ""
+            container: ""
+            zig_version: ""
+
+          - os: ubuntu-latest
+            target: linux-aarch64
+            host: aarch64-linux-gnu
+            cc: aarch64-linux-gnu-gcc
+            cxx: aarch64-linux-gnu-g++
+            cflags: ""
+            cxxflags: ""
+            deps: gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+            container: ""
+            zig_version: ""
+
+          - os: ubuntu-latest
+            target: linux-amd64-musl
+            host: x86_64-linux-musl
+            cc: zig cc -target x86_64-linux-musl
+            cxx: zig c++ -target x86_64-linux-musl
+            cflags: ""
+            cxxflags: ""
+            deps: ""
+            container: ""
+            zig_version: 0.13.0
+
+          - os: ubuntu-latest
+            target: linux-aarch64-musl
+            host: aarch64-linux-musl
+            cc: zig cc -target aarch64-linux-musl
+            cxx: zig c++ -target aarch64-linux-musl
+            cflags: ""
+            cxxflags: ""
+            deps: ""
+            container: ""
+            zig_version: 0.13.0
+
+          - os: ubuntu-latest
+            target: darwin-amd64
+            host: x86_64-apple-darwin20.4
+            cc: o64-clang
+            cxx: o64-clang++
+            cflags: "-arch x86_64"
+            cxxflags: "-arch x86_64 -stdlib=libc++"
+            deps: ""
+            container: ghcr.io/smartmontools/docker-build:master
+            zig_version: ""
+
+          - os: ubuntu-latest
+            target: darwin-aarch64
+            host: x86_64-apple-darwin20.4
+            cc: o64-clang
+            cxx: o64-clang++
+            cflags: "-arch arm64"
+            cxxflags: "-arch arm64 -stdlib=libc++"
+            deps: ""
+            container: ghcr.io/smartmontools/docker-build:master
+            zig_version: ""
+
+          - os: ubuntu-latest
+            target: windows-amd64
+            host: x86_64-w64-mingw32
+            cc: x86_64-w64-mingw32-gcc
+            cxx: x86_64-w64-mingw32-g++
+            cflags: ""
+            cxxflags: ""
+            deps: gcc-mingw-w64-x86-64 g++-mingw-w64-x86-64
+            container: ""
+            zig_version: ""
+
+    runs-on: ${{ matrix.os }}
+    container: ${{ matrix.container || null }}
+    env:
+      VERSION: ${{ needs.prepare.outputs.version }}
+      SMARTMONTOOLS_TEST_BUILD: "1"
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: true
+          fetch-depth: 0
+          ref: ${{ github.event_name == 'workflow_dispatch' && format('v{0}', needs.prepare.outputs.version) || github.ref }}
+
+      - name: Install dependencies
+        if: matrix.deps != ''
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ${{ matrix.deps }}
+
+      - name: Setup Zig toolchain
+        if: matrix.zig_version != ''
+        uses: mlugg/setup-zig@v2
+        with:
+          version: ${{ matrix.zig_version }}
+
+      - name: Setup Darwin cross-compiler PATH
+        if: contains(matrix.target, 'darwin')
+        run: |
+          echo "/usr/osxcross/bin" >> $GITHUB_PATH
+          echo "LD_LIBRARY_PATH=/usr/osxcross/lib" >> $GITHUB_ENV
+
+      - name: Build library
+        working-directory: native
+        shell: bash
+        run: |
+          ./autogen.sh --force
+          mkdir -p build && cd build
+
+          CONFIGURE_ARGS=(--with-devel=yes --with-pic "--with-build-info=(GHA Build)")
+          if [ "${{ matrix.host }}" != "x86_64-linux-gnu" ]; then
+            CONFIGURE_ARGS+=(--build="$(../config.guess)" --host="${{ matrix.host }}")
+          fi
+          [ -n "${{ matrix.cc }}" ] && CONFIGURE_ARGS+=(CC="${{ matrix.cc }}")
+          [ -n "${{ matrix.cxx }}" ] && CONFIGURE_ARGS+=(CXX="${{ matrix.cxx }}")
+          [ -n "${{ matrix.cflags }}" ] && CONFIGURE_ARGS+=(CFLAGS="${{ matrix.cflags }}")
+          [ -n "${{ matrix.cxxflags }}" ] && CONFIGURE_ARGS+=(CXXFLAGS="${{ matrix.cxxflags }}")
+
+          ../configure "${CONFIGURE_ARGS[@]}"
+
+          make -C include
+          make -j"$(nproc)" -C lib libsmartmon.la
+
+      - name: Build C ABI wrapper
+        if: matrix.target != 'windows-amd64'
+        run: scripts/build-wrapper.sh --target ${{ matrix.target }}
+
+      - name: Package artifacts
+        run: |
+          mkdir -p artifacts/lib artifacts/include
+          cp native/build/lib/.libs/libsmartmon.a artifacts/lib/
+          cp -r native/include/smartmon artifacts/include/
+          if [ -d packaging/artifacts/lib ]; then
+            cp packaging/artifacts/lib/* artifacts/lib/
+          fi
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: libsmartmon-${{ matrix.target }}
+          path: artifacts/
+          retention-days: 5
+
+  release:
+    needs: [prepare, build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      VERSION: ${{ needs.prepare.outputs.version }}
+      ACINIT: ${{ needs.prepare.outputs.acinit }}
+      DRY_RUN: ${{ needs.prepare.outputs.dry_run }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - uses: actions/download-artifact@v8
+        with:
+          path: artifacts
+
+      - name: Package release archives
+        run: |
+          mkdir -p release
+          for dir in artifacts/libsmartmon-*; do
+            target=$(basename "$dir" | sed 's/libsmartmon-//')
+            tar -czf "release/libsmartmon-${VERSION}-${target}.tar.gz" -C "$dir" .
+          done
+
+      - name: Compute paired bindings version
+        id: bindings
+        run: |
+          BINDINGS_TAG="$(scripts/next-bindings-go-version.sh --core-version "${VERSION}")"
+          echo "tag=${BINDINGS_TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Build release notes
+        run: |
+          GETVERSION="$(native/src/getversion.sh -n 2>/dev/null || echo 'unavailable')"
+          ABI_MAJOR="$(sed -n 's/^#define SMARTMON_ABI_VERSION_MAJOR \(.*\)$/\1/p' native/capi/smartmon_c_api.h)"
+          ABI_MINOR="$(sed -n 's/^#define SMARTMON_ABI_VERSION_MINOR \(.*\)$/\1/p' native/capi/smartmon_c_api.h)"
+          ABI_PATCH="$(sed -n 's/^#define SMARTMON_ABI_VERSION_PATCH \(.*\)$/\1/p' native/capi/smartmon_c_api.h)"
+
+          {
+            echo "Native core (libsmartmon.a + C ABI wrapper) build ${VERSION}."
+            echo
+            echo "- Upstream smartmontools \`AC_INIT\`: ${ACINIT}"
+            echo "- \`getversion.sh\` string: \`${GETVERSION}\`"
+            echo "- C ABI version: ${ABI_MAJOR}.${ABI_MINOR}.${ABI_PATCH}"
+            echo "- Paired bindings release: [\`${{ steps.bindings.outputs.tag }}\`](https://github.com/${{ github.repository }}/releases/tag/${{ steps.bindings.outputs.tag }})"
+            echo
+            echo "### Assets"
+            for f in release/*; do
+              echo "- $(basename "$f")"
+            done
+          } > release-notes.md
+
+      - name: Dry-run summary
+        if: env.DRY_RUN == 'true'
+        run: |
+          echo "[dry-run] would create/update release v${VERSION} with the following notes:"
+          cat release-notes.md
+          echo "[dry-run] would dispatch release-bindings-go.yml for ${{ steps.bindings.outputs.tag }}"
+
+      - name: Create or update release
+        if: env.DRY_RUN != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG_SHA=$(gh api "repos/${{ github.repository }}/git/refs/tags/v${VERSION}" --jq .object.sha)
+          if [ -z "${TAG_SHA}" ] || [ "${TAG_SHA}" = "null" ]; then
+            echo "::error::tag v${VERSION} not found in ${{ github.repository }} — refusing to create a release without it." >&2
+            exit 1
+          fi
+          gh release delete "v${VERSION}" --repo "${{ github.repository }}" --yes 2>/dev/null || true
+          gh release create "v${VERSION}" \
+            release/* \
+            --target "${TAG_SHA}" \
+            --repo "${{ github.repository }}" \
+            --title "smartmontools-sdk native core v${VERSION}" \
+            --notes-file release-notes.md \
+            --latest
+
+  dispatch-bindings:
+    needs: [prepare, release]
+    if: needs.prepare.outputs.dry_run != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: write
+    env:
+      VERSION: ${{ needs.prepare.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Dispatch bindings release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BINDINGS_TAG="$(scripts/next-bindings-go-version.sh --core-version "${VERSION}")"
+          BINDINGS_VERSION="${BINDINGS_TAG#bindings/go/v}"
+          gh workflow run release-bindings-go.yml \
+            --repo "${{ github.repository }}" \
+            --ref main \
+            -f version="${BINDINGS_VERSION}" \
+            -f core_version="${VERSION}" \
+            -f dry_run=false

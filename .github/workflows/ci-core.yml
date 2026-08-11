@@ -1,0 +1,173 @@
+name: CI (native core)
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.gitmodules'
+      - 'native/drivedb/drivedb.h'
+      - '.github/workflows/ci-core.yml'
+      - 'native/Makefile.am'
+      - 'native/configure.ac'
+      - 'native/capi/**'
+      - 'native/lib/**'
+      - 'native/include/**'
+      - 'native/src/**'
+      - 'scripts/build-wrapper.sh'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: linux-amd64
+            host: x86_64-linux-gnu
+            cc: gcc
+            cxx: g++
+            cflags: ""
+            cxxflags: ""
+            deps: ""
+            container: ""
+            zig_version: ""
+
+          - os: ubuntu-latest
+            target: linux-aarch64
+            host: aarch64-linux-gnu
+            cc: aarch64-linux-gnu-gcc
+            cxx: aarch64-linux-gnu-g++
+            cflags: ""
+            cxxflags: ""
+            deps: gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+            container: ""
+            zig_version: ""
+
+          - os: ubuntu-latest
+            target: linux-amd64-musl
+            host: x86_64-linux-musl
+            cc: zig cc -target x86_64-linux-musl
+            cxx: zig c++ -target x86_64-linux-musl
+            cflags: ""
+            cxxflags: ""
+            deps: ""
+            container: ""
+            zig_version: 0.13.0
+
+          - os: ubuntu-latest
+            target: linux-aarch64-musl
+            host: aarch64-linux-musl
+            cc: zig cc -target aarch64-linux-musl
+            cxx: zig c++ -target aarch64-linux-musl
+            cflags: ""
+            cxxflags: ""
+            deps: ""
+            container: ""
+            zig_version: 0.13.0
+
+          - os: ubuntu-latest
+            target: darwin-amd64
+            host: x86_64-apple-darwin20.4
+            cc: o64-clang
+            cxx: o64-clang++
+            cflags: "-arch x86_64"
+            cxxflags: "-arch x86_64 -stdlib=libc++"
+            deps: ""
+            container: ghcr.io/smartmontools/docker-build:master
+            zig_version: ""
+
+          - os: ubuntu-latest
+            target: darwin-aarch64
+            host: x86_64-apple-darwin20.4
+            cc: o64-clang
+            cxx: o64-clang++
+            cflags: "-arch arm64"
+            cxxflags: "-arch arm64 -stdlib=libc++"
+            deps: ""
+            container: ghcr.io/smartmontools/docker-build:master
+            zig_version: ""
+
+          - os: ubuntu-latest
+            target: windows-amd64
+            host: x86_64-w64-mingw32
+            cc: x86_64-w64-mingw32-gcc
+            cxx: x86_64-w64-mingw32-g++
+            cflags: ""
+            cxxflags: ""
+            deps: gcc-mingw-w64-x86-64 g++-mingw-w64-x86-64
+            container: ""
+            zig_version: ""
+
+    runs-on: ${{ matrix.os }}
+    container: ${{ matrix.container || null }}
+    env:
+      SMARTMONTOOLS_TEST_BUILD: "1"
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: true
+          fetch-depth: 0
+
+      - name: Install dependencies
+        if: matrix.deps != ''
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ${{ matrix.deps }}
+
+      - name: Setup Zig toolchain
+        if: matrix.zig_version != ''
+        uses: mlugg/setup-zig@v2
+        with:
+          version: ${{ matrix.zig_version }}
+
+      - name: Setup Darwin cross-compiler PATH
+        if: contains(matrix.target, 'darwin')
+        run: |
+          echo "/usr/osxcross/bin" >> $GITHUB_PATH
+          echo "LD_LIBRARY_PATH=/usr/osxcross/lib" >> $GITHUB_ENV
+
+      - name: Build library
+        working-directory: native
+        shell: bash
+        run: |
+          ./autogen.sh --force
+          mkdir -p build && cd build
+
+          CONFIGURE_ARGS=(--with-devel=yes --with-pic "--with-build-info=(GHA Build)")
+          if [ "${{ matrix.host }}" != "x86_64-linux-gnu" ]; then
+            CONFIGURE_ARGS+=(--build="$(../config.guess)" --host="${{ matrix.host }}")
+          fi
+          [ -n "${{ matrix.cc }}" ] && CONFIGURE_ARGS+=(CC="${{ matrix.cc }}")
+          [ -n "${{ matrix.cxx }}" ] && CONFIGURE_ARGS+=(CXX="${{ matrix.cxx }}")
+          [ -n "${{ matrix.cflags }}" ] && CONFIGURE_ARGS+=(CFLAGS="${{ matrix.cflags }}")
+          [ -n "${{ matrix.cxxflags }}" ] && CONFIGURE_ARGS+=(CXXFLAGS="${{ matrix.cxxflags }}")
+
+          ../configure "${CONFIGURE_ARGS[@]}"
+
+          make -C include
+          make -j"$(nproc)" -C lib libsmartmon.la
+
+      - name: Build C ABI wrapper
+        if: matrix.target != 'windows-amd64'
+        run: scripts/build-wrapper.sh --target ${{ matrix.target }}
+
+      - name: Package artifacts
+        run: |
+          mkdir -p artifacts/lib artifacts/include
+          cp native/build/lib/.libs/libsmartmon.a artifacts/lib/
+          cp -r native/include/smartmon artifacts/include/
+          if [ -d packaging/artifacts/lib ]; then
+            cp packaging/artifacts/lib/* artifacts/lib/
+          fi
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: libsmartmon-${{ matrix.target }}
+          path: artifacts/
+          retention-days: 5

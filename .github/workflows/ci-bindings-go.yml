@@ -1,0 +1,65 @@
+name: CI (bindings/go)
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'bindings/go/**'
+      - 'native/capi/**'
+      - 'native/drivedb/**'
+      - 'scripts/build-wrapper.sh'
+      - 'scripts/sync-drivedb-go.sh'
+      - '.github/workflows/ci-bindings-go.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lint-and-unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: jdx/mise-action@v2
+        with:
+          working_directory: bindings/go
+
+      - name: mise run ci
+        working-directory: bindings/go
+        run: mise run ci
+
+      - name: Coverage
+        working-directory: bindings/go
+        run: mise run coverage
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          files: bindings/go/coverage.txt
+          flags: bindings-go
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+  drivedb-drift:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Assert no drift between native/drivedb and bindings/go copy
+        run: |
+          scripts/sync-drivedb-go.sh
+          git diff --exit-code -- bindings/go/backends/exec/drivedb.h bindings/go/backends/exec/drivedb_version.go
+
+  integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: true
+
+      - uses: jdx/mise-action@v2
+        with:
+          working_directory: bindings/go
+
+      - name: Run native<->bindings/go integration contract test
+        run: integration/core-go/run.sh

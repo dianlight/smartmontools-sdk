@@ -1,94 +1,118 @@
-## About Smartmontools SDK
+# smartmontools-sdk
 
-This repository produces prebuilt static libraries (`libsmartmon.a`) from
-[smartmontools/smartmontools](https://github.com/smartmontools/smartmontools)
-for multiple platforms and architectures.
+A monorepo SDK for [smartmontools](https://www.smartmontools.org/)'s
+**Self-Monitoring, Analysis and Reporting Technology** (SMART) protocol
+support — a vendored C++ core, a stable C ABI, and language bindings built
+on top of it, all in one repository with a strict one-way dependency:
 
-The upstream smartmontools source is included as a **git submodule** — not
-forked. An SDK overlay (`include/`, `lib/`) wraps the library build targets
-used by consumers such as
-[smartmontools-go](https://github.com/dianlight/smartmontools-go).
+```
+bindings/go, bindings/python, bindings/rust   (language bindings)
+                    │
+                    ▼
+              native/capi/                     (stable C ABI)
+                    │
+                    ▼
+                 native/                        (C++ core, vendored from upstream)
+```
 
-### Supported Platforms
+See [docs/architecture/overview.md](docs/architecture/overview.md) for the
+full picture, and
+[docs/architecture/dependency-rules.md](docs/architecture/dependency-rules.md)
+for why the dependency only ever points one way.
 
-| OS | Architecture |
-|----|-------------|
-| Linux | amd64, aarch64 |
-| macOS (Darwin) | amd64, aarch64 |
-| Windows | amd64 |
+## Repository layout
 
-### How It Works
+| Path | What it is |
+|---|---|
+| [`native/`](native/) | The vendored C++ core, built with autotools into `libsmartmon.a` |
+| [`native/capi/`](native/capi/) | The C ABI boundary (`smartmon_c_api.{cpp,h}`) that every binding calls |
+| [`bindings/go/`](bindings/go/) | Go bindings — implemented, tagged `bindings/go/vX.Y.Z` |
+| [`bindings/python/`](bindings/python/), [`bindings/rust/`](bindings/rust/) | Planned — see [docs/roadmap.md](docs/roadmap.md) |
+| [`scripts/`](scripts/) | Cross-cutting build and sync tooling (`build-wrapper.sh`, `sync-drivedb-go.sh`) |
+| [`integration/`](integration/) | End-to-end contract tests spanning `native/` and a binding |
+| [`packaging/`](packaging/) | Staged release artifacts |
+| [`docs/`](docs/) | The documentation you're browsing now |
 
-1. **Submodule** — `smartmontools/` points to a specific upstream release tag.
-2. **Build workflow** — triggered on PR merge or manual dispatch, compiles
-   `libsmartmon.a` for all 5 platform/arch targets.
-3. **Release** — artifacts are published as GitHub releases tagged with the
-   upstream version (e.g. `v8.0`). Each release contains one `.tar.gz` per
-   target with `lib/libsmartmon.a` and `include/smartmon/*.h`.
-4. **Automated updates** — a daily workflow checks for new upstream release
-   tags and opens a PR to update the submodule.
+Full directory-by-directory ownership: [docs/architecture/repository-layout.md](docs/architecture/repository-layout.md).
 
-### Using a prebuilt release
+## Using a prebuilt release
 
-Download the appropriate archive from the
+Native-core release tarballs are published per target on the
 [releases page](https://github.com/dianlight/smartmontools-sdk/releases),
-then add the library and headers to your build:
+tagged `vX.Y.Z`:
 
 ```bash
 tar -xzf libsmartmon-<version>-<target>.tar.gz -C /usr/local
-# lib/libsmartmon.a → /usr/local/lib/libsmartmon.a
-# include/smartmon/ → /usr/local/include/smartmon/
+# lib/libsmartmon.a       → /usr/local/lib/libsmartmon.a
+# include/smartmon/       → /usr/local/include/smartmon/
+# lib/libsmartmon_go.*     → the C ABI wrapper shared library
 ```
 
-Link against it with `-lsmartmon` (and `-lstdc++` for C++ symbol resolution).
+Link the static library with `-lsmartmon -lstdc++`. The Go bindings are
+distributed separately via the Go module proxy — see
+[bindings/go/README.md](bindings/go/README.md).
 
-### Building locally
-
-Requires: autoconf, automake, libtool, a C++11 compiler.
+## Building locally
 
 ```bash
-git clone --recurse-submodules https://github.com/dianlight/smartmontools-sdk.git
-cd smartmontools-sdk
-./autogen.sh
-mkdir build && cd build
-../configure --with-devel=yes
+sudo apt-get install -y autoconf automake libtool   # Debian/Ubuntu
+
+cd native
+./autogen.sh --force
+mkdir -p build && cd build
+../configure --with-devel=yes --with-pic
 make -C include
-make -j$(nproc) -C lib libsmartmon.la
+make -j"$(nproc)" -C lib libsmartmon.la
 ```
 
-The static library will be at `build/lib/.libs/libsmartmon.a` and the public
-headers under `include/smartmon/`.
+`--with-pic` matters: without it, `libsmartmon.a` contains non-PIC objects
+that cannot be linked into `native/capi/`'s shared-library wrapper. See
+[docs/development/build-core.md](docs/development/build-core.md) for the
+full explanation, cross-compilation targets, and how to build the wrapper
+itself. For the complete local dev loop, including the end-to-end
+`native/` ↔ Go contract test, see
+[docs/development/local-development.md](docs/development/local-development.md).
 
-### Public headers
+## Public headers
 
-All public headers are installed under `include/smartmon/`:
+Installed under `include/smartmon/` by the native build:
 
 | Header | Description |
-|--------|-------------|
+|---|---|
 | `dev_interface.h` | Core device abstraction (open, identify, passthrough) |
 | `atacmds.h` | ATA/SATA command set |
 | `nvmecmds.h` | NVMe command set |
-| `scsicmds.h` (via lib) | SCSI/SAS command set |
+| `scsicmds.h` | SCSI/SAS command set |
 | `json.h` | JSON output builder |
 | `utility.h` | Logging, string helpers |
 | `smartmon_defs.h` | Common macros and type definitions |
 
----
+The C ABI wrapper's own header, `native/capi/smartmon_c_api.h`, is the
+12-symbol surface any language binding depends on — see
+[docs/architecture/abi-contract.md](docs/architecture/abi-contract.md).
 
-## About Smartmontools
+## Migrating from the old two-repository layout
 
-The smartmontools package implements the **Self-Monitoring, Analysis and
-Reporting Technology** (SMART) protocol for ATA/SATA, SCSI/SAS and NVMe
-storage devices. This SDK exposes the core library (`libsmartmon`) so that
-other programs can query device health without spawning a subprocess.
+If you previously depended on the standalone `smartmontools-go` repository,
+see [docs/migration/smartmontools-go-to-bindings-go.md](docs/migration/smartmontools-go-to-bindings-go.md)
+for what moved and [docs/migration/import-path-migration.md](docs/migration/import-path-migration.md)
+for a copy-pasteable import-rewrite recipe.
+
+## About smartmontools
+
+The smartmontools package implements the SMART protocol for ATA/SATA,
+SCSI/SAS and NVMe storage devices. This SDK vendors its core library
+(`libsmartmon`) so other programs — from any language, via `native/capi/` —
+can query device health without spawning a subprocess, while still
+supporting the exec-a-subprocess approach for consumers that prefer it (see
+[bindings/go/README.md](bindings/go/README.md)'s `ExecBackend`).
 
 ## Links
 
 - [Smartmontools homepage](https://www.smartmontools.org/)
 - [Upstream repository](https://github.com/smartmontools/smartmontools)
 - [Smartmontools releases](https://github.com/smartmontools/smartmontools/releases)
-- [smartmontools-go](https://github.com/dianlight/smartmontools-go) — Go bindings
 
 ## License
 
-Smartmontools uses [GNU GPL Version 2](https://www.gnu.org/licenses/gpl-2.0.html#SEC1) license.
+GPL-2.0-or-later. See [COPYING](COPYING).
