@@ -34,7 +34,7 @@ jobs:
         run: mise run coverage
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v7
         with:
           files: bindings/go/coverage.txt
           flags: bindings-go
