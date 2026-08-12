@@ -26,17 +26,91 @@ enough git history to count from.
 
 ## Core version numbering
 
-The core version scheme is `v<AC_INIT>.<N>`, where `<AC_INIT>` is the
-smartmontools package version from `native/configure.ac` (scraped by
+The core version scheme is `v<AC_INIT>.<N>[-pre.<revs>]`, where `<AC_INIT>` is
+the smartmontools package version from `native/configure.ac` (scraped by
 `scripts/next-core-version.sh` with the exact same expression
-`native/src/getversion.sh` uses, so the two can never disagree) and `<N>` is a
-per-generation counter that resets whenever `AC_INIT` changes. This makes the
-tag fully computable from the tree and `sort -V`-correct.
+`native/src/getversion.sh` uses, so the two can never disagree), `<N>` is a
+per-generation counter that resets whenever `AC_INIT` changes, and the
+optional `-pre.<revs>` suffix is a SemVer prerelease identifier carrying the
+same commit count `getversion.sh` embeds in its own build string (`revs` is
+`git rev-list --count` from a fixed `base_git_rev`, computed once by
+`scripts/prerelease-state.sh` and shared by both version scripts so they can
+never disagree on it either). This makes the tag fully computable from the
+tree and, via `scripts/semver-sort.sh`, correctly orderable — plain `sort -V`
+and `git tag --sort=-v:refname` both rank a `-pre.N` suffix *higher* than the
+release it precedes, the opposite of SemVer §11.3, so neither is used for
+this scheme.
+
+**The suffix is present exactly when `native/configure.ac`'s
+`smartmontools_release_date` is commented out** — i.e. exactly when
+`native/src/getversion.sh` itself considers the tree a pre-release. There is
+no separate flag to keep in sync: `scripts/prerelease-state.sh
+--is-prerelease` reads the same field. The suffix disappears — the tree
+"graduates" to a final release — the first time upstream sets that field for
+the `8.0` generation; no repo-side action is needed beyond re-vendoring that
+commit.
 
 `native/src/getversion.sh` hard-errors on any version below `8.0` or with
 more than two components, so this scheme's floor is `v8.0.0`. The historical
 tag `v7.5` predates the scheme entirely and is mislabelled — see
 [compatibility-matrix.md](../migration/compatibility-matrix.md)'s footnote.
+
+### The `v8.0.0` / `v8.0.1` tombstone
+
+`v8.0.0` and `bindings/go/v8.0.0` were published as **final** releases on
+2026-08-11 while upstream smartmontools 8.0 was (and still is) unreleased —
+the release tooling at the time didn't yet check
+`smartmontools_release_date` before minting a version. Both are permanently
+part of the Go module checksum database and the GitHub release history;
+neither can be recalled, only worked around. `v8.0.1` /
+`bindings/go/v8.0.1` are stable (non-prerelease) tags containing no code
+changes beyond a `retract` block in `bindings/go/go.mod` naming both `v8.0.0`
+and themselves. This is not a mistake to clean up — do not delete either tag.
+
+The reason a *stable* tombstone is required, not just a `retract` entry
+somewhere: Go's `@latest` query prefers the newest release over any
+prerelease, even one that outranks it in raw SemVer precedence, and it only
+consults a version's `retract` directives once that version is already the
+`@latest` candidate. A `retract` block published only inside a prerelease's
+`go.mod` is therefore never read by a plain `go get`. Publishing `v8.0.1` as
+a stable release makes it (temporarily) the `@latest` candidate, whose
+`go.mod` retractions then exclude both it and `v8.0.0` from consideration —
+at which point `@latest` falls through to the newest `-pre.N` release, which
+is what should have been published all along:
+
+```
+go get .../v8@latest
+  -> resolves v8.0.1 (highest stable release)
+  -> reads its go.mod, sees v8.0.0 and v8.0.1 both retracted
+  -> excludes both, re-resolves among what remains
+  -> lands on the newest v8.0.2-pre.N        <- the intended outcome
+```
+
+This has a real limit: anyone who already pinned `@v8.0.0` explicitly before
+this fix sees nothing different — retraction only changes what an *upgrade*
+resolves to (`go list -m -u` will now show a warning), it cannot rewrite or
+break an existing lockfile. That is the ceiling of what is achievable once a
+version has been published; it is why the tombstone matters far more than
+deleting the tag, which only tidies the GitHub UI and has no effect on
+`go get` at all (`proxy.golang.org` mirrors a version independently of
+whether its origin tag still exists).
+
+### Consuming a prerelease
+
+While the core carries a `-pre.<revs>` suffix, a plain `go get
+github.com/dianlight/smartmontools-sdk/bindings/go/v8` (no explicit
+`@version`) does **not** select it — Go's default `@latest` query still
+prefers a release over a prerelease in general, it only falls through past
+`v8.0.0`/`v8.0.1` because those specific versions retract themselves (see
+above). Pin the exact version to get the prerelease intentionally:
+
+```
+go get github.com/dianlight/smartmontools-sdk/bindings/go/v8@v8.0.2-pre.504
+```
+
+The native core's release page and the bindings' release notes both state
+this explicitly for every prerelease build (see `release-core.yml` and
+`release-bindings-go.yml`'s "Create or update release" steps).
 
 ## The release cascade
 
@@ -57,7 +131,7 @@ upstream smartmontools releases RELEASE_8_1
   │
   ├─ update-submodule.yml (check-drivedb)
   │    drivedb.h differs → PR (both copies, via scripts/sync-drivedb-go.sh)
-  │      merge → gate PASS (drivedb.h participates in the build) → v8.0.1 → bindings/go/v8.0.1
+  │      merge → gate PASS (drivedb.h participates in the build) → v8.1.1 → bindings/go/v8.1.1
   │
   └─ safety net: a merge touching only .gitmodules/native/upstream
        → gate FAIL → no tag, no release, tracking issue opened instead
@@ -200,6 +274,24 @@ the local helper and CI never disagree:
   suffixed `-beta.N` (bumped from the current beta count on that branch).
 - On a branch with no open PR: hard error — prereleases only make sense
   attached to a reviewable PR.
+
+**This entire task hard-errors up front while the core itself is a
+`-pre.<revs>` prerelease** (see the tombstone section above), before either
+branch above is even evaluated — checked via
+`scripts/prerelease-state.sh --is-prerelease`. Two independent reasons this
+is a hard block rather than something to route around: there is no correct
+version for a standalone bindings bump to target on `main` while the
+mainline series is itself a moving target (`next-bindings-go-version.sh
+--bump` refuses for the same reason); and on a branch, the `-beta.N`
+computation above reads the *nearest reachable* tag via `git describe
+--abbrev=0`, not the true newest by SemVer precedence, so it would happily
+mint `-pre.<revs+1>` from an unreviewed branch and hijack the mainline
+prerelease channel. Nesting the branch channel under the mainline one (e.g.
+`-pre.<revs>.beta.N`) does not fix this — SemVer §11.4.4 ranks *more*
+identifier fields higher when preceding fields are equal, so that scheme
+would make PR builds outrank mainline, the opposite of the intended fix.
+Standalone bindings releases resume once the core graduates to a final
+release.
 
 Major bumps are **not** offered here: they change the module's `/vN` import
 path and require the manual steps in the "`/v8` module path" section above,

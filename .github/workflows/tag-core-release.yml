@@ -63,7 +63,13 @@ jobs:
         id: version
         run: |
           VERSION="$(scripts/next-core-version.sh)"
-          PREV="$(scripts/next-core-version.sh --current)"
+          # --current-any (not --current): the artifact-diff gate needs the
+          # truth regardless of prerelease status. --current is stable-only
+          # and would return empty (or a stale earlier generation's tag)
+          # while every existing tag for this generation is a -pre.N
+          # prerelease, making every merge trivially pass the gate as a
+          # false "first release for this generation".
+          PREV="$(scripts/next-core-version.sh --current-any)"
 
           if [ -z "${PREV}" ]; then
             # First release for this AC_INIT generation — nothing to diff

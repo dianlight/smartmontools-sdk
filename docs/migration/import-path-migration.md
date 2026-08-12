@@ -19,13 +19,24 @@ was renamed or restructured within the tree.
 
 ```
 - require github.com/dianlight/smartmontools-go v0.4.1
-+ require github.com/dianlight/smartmontools-sdk/bindings/go/v8 v8.0.0
++ require github.com/dianlight/smartmontools-sdk/bindings/go/v8 v8.0.2-pre.504
 ```
+
+(Pin whatever version is current when you migrate — check
+[../../bindings/go/CHANGELOG.md](../../bindings/go/CHANGELOG.md) or
+`go list -m -versions github.com/dianlight/smartmontools-sdk/bindings/go/v8`.
+`v8.0.2-pre.504` above is illustrative, not a fixed target: the suffix
+advances with every prerelease commit count. Note also that `v8.0.0` exists
+but is **retracted** — do not pin new code to it; see
+[compatibility-matrix.md](compatibility-matrix.md) and
+[../development/release-process.md](../development/release-process.md#the-v800--v801-tombstone)
+for why.)
 
 There is no intermediate `v0.5.0` step to migrate through: that version was
 never actually tagged (`git tag -l 'bindings/go/*'` is empty before this
-scheme), so the first real release of this module is `bindings/go/v8.0.0`,
-matching the native core's version under the release cascade described in
+scheme), so the first real release of this module is `bindings/go/v8.0.0` —
+now retracted, see above — matching the native core's version under the
+release cascade described in
 [../development/release-process.md](../development/release-process.md).
 
 Tag prefix also changed: the old repository tagged bare `vX.Y.Z`; the new
