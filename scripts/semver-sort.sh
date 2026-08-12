@@ -45,7 +45,12 @@ key_and_line() {
   rest="${rest#v}"
 
   case "${rest}" in
-    *-*) core="${rest%%-*}"; prerelease="${rest#*-}" ;;
+    *-*)
+      core="${rest%%-*}"; prerelease="${rest#*-}"
+      # A trailing hyphen with nothing after it (e.g. "8.0.2-") is not a
+      # valid SemVer prerelease — it must have at least one identifier.
+      [ -n "${prerelease}" ] || return 1
+      ;;
     *)   core="${rest}"; prerelease="" ;;
   esac
 
@@ -54,9 +59,12 @@ key_and_line() {
     *.*) minor="${core%%.*}"; patch="${core#*.}" ;;
     *) return 1 ;;
   esac
-  case "${major}" in '' | *[!0-9]*) return 1 ;; esac
-  case "${minor}" in '' | *[!0-9]*) return 1 ;; esac
-  case "${patch}" in '' | *[!0-9]*) return 1 ;; esac
+  # Reject empty/non-numeric components, and leading zeroes on any
+  # component with more than one digit ("0" alone is valid; "00"/"01" are
+  # not — SemVer §9 forbids leading zeroes on numeric identifiers).
+  case "${major}" in '' | *[!0-9]* | 0[0-9]*) return 1 ;; esac
+  case "${minor}" in '' | *[!0-9]* | 0[0-9]*) return 1 ;; esac
+  case "${patch}" in '' | *[!0-9]* | 0[0-9]*) return 1 ;; esac
 
   # Zero-pad each numeric core component to a fixed width so plain string
   # comparison reproduces numeric comparison (SemVer §11.2). The `10#0$x`
@@ -73,11 +81,20 @@ key_and_line() {
     local id out=""
     for id in ${prerelease//./ }; do
       case "${id}" in
-        '' | *[!0-9]*)
+        '')
+          return 1 # empty identifier (e.g. from "..")
+          ;;
+        *[!0-9A-Za-z-]*)
+          return 1 # character outside SemVer's allowed identifier set
+          ;;
+        *[!0-9]*)
           # Alphanumeric identifier: always higher precedence than a
           # numeric one at the same position (SemVer §11.4.3), so prefix
           # with '1' (sorts after the '0' numeric prefix below).
           out="${out}.1${id}"
+          ;;
+        0[0-9]*)
+          return 1 # numeric identifier with a leading zero (SemVer §9)
           ;;
         *)
           # Numeric identifier: compare numerically, so zero-pad it, and
