@@ -298,13 +298,23 @@ jobs:
             exit 1
           fi
           gh release delete "v${VERSION}" --repo "${{ github.repository }}" --yes 2>/dev/null || true
+
+          # --prerelease and --latest are mutually exclusive on the GitHub
+          # REST API ("Drafts and prereleases cannot be set as latest" — an
+          # API error, not a silent no-op), so the flag must be chosen based
+          # on the version string itself rather than always passing one.
+          LATEST_OR_PRERELEASE_FLAG="--latest"
+          if [[ "${VERSION}" == *-* ]]; then
+            LATEST_OR_PRERELEASE_FLAG="--prerelease"
+          fi
+
           gh release create "v${VERSION}" \
             release/* \
             --target "${TAG_SHA}" \
             --repo "${{ github.repository }}" \
             --title "smartmontools-sdk native core v${VERSION}" \
             --notes-file release-notes.md \
-            --latest
+            "${LATEST_OR_PRERELEASE_FLAG}"
 
   dispatch-bindings:
     needs: [prepare, release]
