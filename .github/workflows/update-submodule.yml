@@ -94,7 +94,7 @@ jobs:
           (cd native/upstream && git fetch --tags origin && git checkout "${TAG}")
           git add native/upstream
 
-          if git merge --no-commit --no-ff "${TAG}"; then
+          if git merge --no-commit --no-ff --allow-unrelated-histories "${TAG}"; then
             git commit -m "Merge smartmontools ${TAG}
 
           Automated re-vendoring merge of upstream release ${TAG} into native/,
