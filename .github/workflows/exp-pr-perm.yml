@@ -1,0 +1,114 @@
+name: exp-pr-perm
+
+on:
+  workflow_dispatch:
+    inputs:
+      scenario:
+        required: true
+        type: choice
+        options:
+          - native-tiny
+          - gitlink-only
+          - upstream-subset
+          - control-failing
+      sha:
+        description: "Upstream commit SHA (gitlink-only, upstream-subset)"
+        required: false
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Scenario native-tiny
+        if: inputs.scenario == 'native-tiny'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euxo pipefail
+          BRANCH="exp/native-tiny-${{ github.run_id }}"
+          git fetch origin main
+          git checkout -B "$BRANCH" origin/main
+          echo "experiment native-tiny $(date -u +%s)" > docs/exp-native-tiny.md
+          git add docs/exp-native-tiny.md
+          git commit -m "test(exp): native tiny file"
+          git push origin "$BRANCH"
+          gh pr create --base main --head "$BRANCH" \
+            --title "EXP native-tiny ${{ github.run_id }}" \
+            --body "Native-tiny scenario: one small native file, no upstream content, no gitlink change."
+          echo "SUCCESS: native-tiny PR created"
+
+      - name: Scenario gitlink-only
+        if: inputs.scenario == 'gitlink-only'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SHA: ${{ inputs.sha }}
+        run: |
+          set -euxo pipefail
+          BRANCH="exp/gitlink-only-${{ github.run_id }}"
+          git fetch origin main
+          git checkout -B "$BRANCH" origin/main
+          git submodule update --init --depth 1 native/upstream
+          (cd native/upstream && git fetch --depth=1 origin "$SHA" && git checkout --detach "$SHA")
+          git add native/upstream
+          git commit -m "test(exp): gitlink-only change to ${SHA}"
+          git push origin "$BRANCH"
+          gh pr create --base main --head "$BRANCH" \
+            --title "EXP gitlink-only ${{ github.run_id }}" \
+            --body "Gitlink-only scenario: only the native/upstream pointer changed (to ${SHA}). No other diff."
+          echo "SUCCESS: gitlink-only PR created"
+
+      - name: Scenario upstream-subset
+        if: inputs.scenario == 'upstream-subset'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SHA: ${{ inputs.sha }}
+        run: |
+          set -euxo pipefail
+          BRANCH="exp/upstream-subset-${{ github.run_id }}"
+          git remote add upstream https://github.com/smartmontools/smartmontools.git
+          git fetch upstream "$SHA" --depth=1
+          git fetch origin main
+          git checkout -B "$BRANCH" origin/main
+          mkdir -p smartmontools
+          git show "$SHA:smartmontools/drivedb.h" > smartmontools/drivedb.h
+          wc -l smartmontools/drivedb.h
+          git add smartmontools/drivedb.h
+          git commit -m "test(exp): add upstream-identical drivedb.h at ${SHA}"
+          git push origin "$BRANCH"
+          gh pr create --base main --head "$BRANCH" \
+            --title "EXP upstream-subset ${{ github.run_id }}" \
+            --body "Upstream-subset scenario: adds ONE file (smartmontools/drivedb.h) byte-identical to upstream smartmontools/smartmontools. No gitlink change."
+          echo "SUCCESS: upstream-subset PR created"
+
+      - name: Scenario control-failing
+        if: inputs.scenario == 'control-failing'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euxo pipefail
+          BRANCH="exp/control-${{ github.run_id }}"
+          git fetch origin main
+          git fetch origin update-smartmontools-7.5
+          git checkout -B "$BRANCH" origin/update-smartmontools-7.5
+          git rev-parse HEAD
+          git push origin "$BRANCH"
+          gh pr create --base main --head "$BRANCH" \
+            --title "EXP control-failing ${{ github.run_id }}" \
+            --body "Control scenario: same head commit as the failing force run (update-smartmontools-7.5), on a fresh branch name."
+          echo "SUCCESS: control PR created"
