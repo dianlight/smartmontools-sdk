@@ -81,8 +81,10 @@ jobs:
         run: |
           set -euxo pipefail
           BRANCH="exp/upstream-subset-${{ github.run_id }}"
-          git remote add upstream https://github.com/smartmontools/smartmontools.git
-          git fetch upstream "$SHA" --depth=1
+          # SHA must be the upstream RELEASE_7_5 tag commit, whose tree has
+          # smartmontools/drivedb.h with blob e6ec5022... (byte-identical to
+          # the file in the failing re-vendor head).
+          git fetch --depth=1 https://github.com/smartmontools/smartmontools.git "$SHA"
           git fetch origin main
           git checkout -B "$BRANCH" origin/main
           mkdir -p smartmontools
