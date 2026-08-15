@@ -4,6 +4,12 @@ on:
   schedule:
     - cron: "0 6 * * *"
   workflow_dispatch:
+    inputs:
+      force:
+        description: "Bypass the already-merged check and force a re-vendoring run (merge + PR)"
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: write
@@ -57,19 +63,25 @@ jobs:
           fi
           echo "Latest upstream release tag: ${LATEST_TAG}"
 
-          # A completed `git merge <tag>` makes that tag's commit an ancestor
-          # of our HEAD by construction, so this is a reliable "already
-          # merged" test regardless of whether the tag sits on upstream's own
-          # main (see docs/development/release-process.md — upstream's own
-          # RELEASE_7_5 tag object is a known historical exception: it is
-          # content-identical to, but not the same commit as, what this
-          # repo's history actually merged; this self-heals after one run
-          # with a harmless empty-diff PR, since the gate below rejects it).
-          if git merge-base --is-ancestor "${LATEST_TAG}" HEAD; then
-            echo "Already merged into main"
+          # "Already re-vendored" is decided by comparing the native/upstream
+          # submodule gitlink on main against the newest tag's commit — NOT by
+          # `git merge-base --is-ancestor`. Upstream tag commits never enter
+          # this repo's history (the re-vendoring PR head is a single native
+          # commit; see the merge step below), so an ancestry test can never
+          # be true and would re-open the same re-vendor every run. The
+          # gitlink records exactly which upstream tag was last merged (see
+          # docs/architecture/repository-layout.md). A manual `force` run
+          # bypasses the gate for testing.
+          CURRENT_GITLINK="$(git rev-parse HEAD:native/upstream)"
+          TAG_COMMIT="$(git rev-parse "${LATEST_TAG}^{commit}")"
+          echo "Current native/upstream gitlink: ${CURRENT_GITLINK}"
+          echo "Latest upstream release tag commit: ${TAG_COMMIT} (${LATEST_TAG})"
+
+          if [ "$CURRENT_GITLINK" = "$TAG_COMMIT" ] && [ "${{ github.event.inputs.force }}" != "true" ]; then
+            echo "Already re-vendored into main"
             echo "has_update=false" >> "$GITHUB_OUTPUT"
           else
-            echo "Not yet merged — will attempt to merge ${LATEST_TAG}"
+            echo "Not yet re-vendored — will attempt to merge ${LATEST_TAG}"
             echo "has_update=true" >> "$GITHUB_OUTPUT"
             echo "new_tag=${LATEST_TAG}" >> "$GITHUB_OUTPUT"
             VERSION="${LATEST_TAG#RELEASE_}"
@@ -95,10 +107,20 @@ jobs:
           git add native/upstream
 
           if git merge --no-commit --no-ff --allow-unrelated-histories "${TAG}"; then
-            git commit -m "Merge smartmontools ${TAG}
+            # Record the merged tree as a SINGLE native commit whose only
+            # parent is main. A two-parent merge would pull the upstream tag
+            # commit (from smartmontools/smartmontools.git) into this PR's
+            # head, and GitHub refuses gh pr create when a head commit is
+            # attributed to a repository the GITHUB_TOKEN integration has no
+            # access to — "Resource not accessible by integration
+            # (createPullRequest)". The commit-tree below produces the same
+            # tree, hence the same diff, minus the foreign parent.
+            MERGE_TREE="$(git write-tree)"
+            NEW_COMMIT="$(git commit-tree "${MERGE_TREE}" -p main -m "Re-vendor smartmontools ${TAG}
 
           Automated re-vendoring merge of upstream release ${TAG} into native/,
-          plus the corresponding native/upstream gitlink bump."
+          plus the corresponding native/upstream gitlink bump.")"
+            git update-ref "refs/heads/${BRANCH}" "${NEW_COMMIT}"
             git push origin "${BRANCH}" --force
 
             gh pr create \
@@ -111,10 +133,14 @@ jobs:
           else
             CONFLICTS=$(git diff --name-only --diff-filter=U)
             git add -A
-            git commit -m "Merge smartmontools ${TAG} (CONFLICTS — needs manual resolution)
+            # Same single-parent native commit as the clean path (conflict
+            # markers are committed as-is for a human to resolve).
+            MERGE_TREE="$(git write-tree)"
+            NEW_COMMIT="$(git commit-tree "${MERGE_TREE}" -p main -m "Re-vendor smartmontools ${TAG} (CONFLICTS — needs manual resolution)
 
           Conflicting paths:
-          ${CONFLICTS}"
+          ${CONFLICTS}")"
+            git update-ref "refs/heads/${BRANCH}" "${NEW_COMMIT}"
             git push origin "${BRANCH}" --force
 
             gh pr create \

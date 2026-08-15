@@ -70,12 +70,20 @@ matters as an audit trail of which upstream tag was last merged, updated by
 
 **Upgrading the vendored core is a real `git merge`**, not a manual
 re-copy-and-diff exercise — `update-submodule.yml`'s `check-update` job
-merges the newest untracked upstream `RELEASE_*` tag directly into `main` via
-a PR. Because this repo has deliberately deleted the smartctl/smartd CLI
-sources upstream still carries under `src/` (and restructured directories
-upstream itself later also restructured), a merge of a new upstream release
-frequently conflicts on exactly those paths; when it does, the workflow opens
-a draft PR with the conflict list instead of guessing at a resolution. See
+merges the newest untracked upstream `RELEASE_*` tag's tree into the index
+with `git merge`, then records the result as a **single native commit** (via
+`git write-tree` + `git commit-tree` with `main` as the only parent). It
+deliberately does *not* commit a two-parent merge: the upstream tag commit
+never enters this repo's history, and GitHub refuses `gh pr create` when a
+head commit is attributed to a repository the `GITHUB_TOKEN` integration has
+no access to ("Resource not accessible by integration
+(createPullRequest)"). The resulting PR carries the same tree — and therefore
+the same diff — a two-parent merge would have produced. Because this repo has
+deliberately deleted the smartctl/smartd CLI sources upstream still carries
+under `src/` (and restructured directories upstream itself later also
+restructured), a merge of a new upstream release frequently conflicts on
+exactly those paths; when it does, the workflow opens a draft PR with the
+conflict list instead of guessing at a resolution. See
 [release-process.md](../development/release-process.md#re-vendoring-upstream)
 for the merge→tag→release cascade this triggers.
 

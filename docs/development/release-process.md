@@ -118,7 +118,7 @@ this explicitly for every prerelease build (see `release-core.yml` and
 upstream smartmontools releases RELEASE_8_1
   │
   ├─ update-submodule.yml (check-update, daily 06:00 UTC)
-  │    git merge RELEASE_8_1  →  PR with the real source diff
+  │    merge RELEASE_8_1's tree → single native commit → PR with the real source diff
   │    (conflicts → draft PR listing conflicting paths; human resolves)
   │      merge to main
   │        └─ tag-core-release.yml (push: main)
@@ -173,8 +173,27 @@ there but not here.
 ### Re-vendoring upstream
 
 `update-submodule.yml`'s `check-update` job fetches
-`smartmontools/smartmontools.git`'s tags, finds the newest `RELEASE_*` tag not
-already an ancestor of `main`, and attempts `git merge` on a fresh
+`smartmontools/smartmontools.git`'s tags and finds the newest `RELEASE_*`
+tag. It decides whether the release is already re-vendored by comparing the
+`native/upstream` submodule gitlink on `main` against that tag's commit —
+**not** by `git merge-base --is-ancestor`: upstream tag commits never enter
+this repo's history (the re-vendoring PR head is a single native commit; see
+below), so an ancestry test can never be true and would re-open the same
+re-vendor every day. The gitlink records exactly which upstream tag was last
+merged (see
+[repository-layout.md](../architecture/repository-layout.md#vendoring-strategy-this-repo-is-the-fork)).
+A manual `workflow_dispatch` can bypass the check with the `force` input.
+
+When a release is not yet re-vendored, the job stages the tag's tree into the
+index with a **real `git merge`** (so conflict detection works exactly as
+before), then records the result as a **single native commit** whose only
+parent is `main` (`git write-tree` + `git commit-tree`). It does not commit a
+two-parent merge: that would pull the upstream tag commit into the PR head,
+and GitHub refuses `gh pr create` when a head commit is attributed to a
+repository the `GITHUB_TOKEN` integration has no access to ("Resource not
+accessible by integration (createPullRequest)"). The commit-tree produces the
+same tree as the merge commit, minus the foreign parent — the diff is
+identical either way. It then attempts the merge on a fresh
 `update-smartmontools-<version>` branch:
 
 - **Clean merge** → pushed, and a normal PR is opened carrying the real
