@@ -12,6 +12,8 @@ on:
           - upstream-subset
           - control-failing
           - same-ref
+          - force-replica
+          - force-fresh
       sha:
         description: "Upstream commit SHA (gitlink-only, upstream-subset)"
         required: false
@@ -137,3 +139,46 @@ jobs:
             --base main \
             --head "update-smartmontools-7.5"
           echo "SUCCESS: same-ref PR created"
+
+      - name: Scenario force-replica
+        if: inputs.scenario == 'force-replica'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euxo pipefail
+          git fetch origin main
+          git fetch origin refs/pull/28/head:refs/exp/oldhead
+          git fetch origin refs/heads/update-smartmontools-7.5
+          # Exact replica of failing run 31866746128: the branch was at the
+          # old foreign head (646c05a15), then force-pushed to the native head
+          # (bb36d911), then PR created immediately (<1s later).
+          git checkout -B update-smartmontools-7.5 refs/exp/oldhead
+          git push origin update-smartmontools-7.5 --force
+          git checkout -B update-smartmontools-7.5 origin/update-smartmontools-7.5
+          git push origin update-smartmontools-7.5 --force
+          gh pr create --base main --head update-smartmontools-7.5 \
+            --title "EXP force-replica ${{ github.run_id }}" \
+            --body "Force-replica: old foreign head -> force-push native head -> create immediately."
+          echo "SUCCESS: force-replica PR created"
+
+      - name: Scenario force-fresh
+        if: inputs.scenario == 'force-fresh'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euxo pipefail
+          BRANCH="exp/force-fresh-${{ github.run_id }}"
+          git fetch origin main
+          git fetch origin refs/pull/28/head:refs/exp/oldhead
+          git fetch origin refs/heads/update-smartmontools-7.5
+          git checkout -B "$BRANCH" origin/main
+          # Fresh branch name, same force-push sequence (foreign head then
+          # native head) — isolates whether the branch's PR history matters.
+          git reset --hard refs/exp/oldhead
+          git push origin "$BRANCH" --force
+          git reset --hard origin/update-smartmontools-7.5
+          git push origin "$BRANCH" --force
+          gh pr create --base main --head "$BRANCH" \
+            --title "EXP force-fresh ${{ github.run_id }}" \
+            --body "Force-fresh: fresh branch force-pushed through old foreign head then native head, then create."
+          echo "SUCCESS: force-fresh PR created"
