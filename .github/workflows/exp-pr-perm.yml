@@ -11,6 +11,7 @@ on:
           - gitlink-only
           - upstream-subset
           - control-failing
+          - same-ref
       sha:
         description: "Upstream commit SHA (gitlink-only, upstream-subset)"
         required: false
@@ -114,3 +115,25 @@ jobs:
             --title "EXP control-failing ${{ github.run_id }}" \
             --body "Control scenario: same head commit as the failing force run (update-smartmontools-7.5), on a fresh branch name."
           echo "SUCCESS: control PR created"
+
+      - name: Scenario same-ref
+        if: inputs.scenario == 'same-ref'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euxo pipefail
+          git fetch origin main
+          git fetch origin update-smartmontools-7.5
+          git checkout -B "update-smartmontools-7.5" origin/update-smartmontools-7.5
+          git rev-parse HEAD
+          cat > /tmp/pr_body.md <<'EOF'
+          Automated merge of upstream release tag `RELEASE_7_5` into `native/`, carrying the real source diff (this is a genuine `git merge`, not a submodule bump — see docs/architecture/repository-layout.md).
+
+          Once this PR merges to `main`, `tag-core-release.yml` will detect the merge, compute the next core version (`scripts/next-core-version.sh`), tag it, and dispatch `release-core.yml` — which builds every target, publishes the core release, and then dispatches `release-bindings-go.yml` to publish a paired bindings release at the same version. If this merge happens to change nothing in the native-core build artifact (see `scripts/core-artifact-changed.sh`), that gate will skip tagging and open a tracking issue instead of shipping a no-op release.
+          EOF
+          gh pr create \
+            --title "Merge smartmontools RELEASE_7_5 (v7.5)" \
+            --body-file /tmp/pr_body.md \
+            --base main \
+            --head "update-smartmontools-7.5"
+          echo "SUCCESS: same-ref PR created"
