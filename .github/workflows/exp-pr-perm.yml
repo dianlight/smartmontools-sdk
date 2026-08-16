@@ -17,6 +17,8 @@ on:
           - wf-change
           - force-replica2-nosleep
           - force-replica2-sleep
+          - foreign-parent-clean
+          - foreign-head
       sha:
         description: "Upstream commit SHA (gitlink-only, upstream-subset)"
         required: false
@@ -241,3 +243,44 @@ jobs:
             --title "EXP force-replica2-sleep ${{ github.run_id }}" \
             --body "force-replica2-sleep: same as nosleep but with 30s settle delay after force-push."
           echo "SUCCESS: force-replica2-sleep PR created"
+
+      - name: Scenario foreign-parent-clean
+        if: inputs.scenario == 'foreign-parent-clean'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euxo pipefail
+          BRANCH="exp/foreign-parent-${{ github.run_id }}"
+          git fetch origin main
+          # Fetch the upstream tag commit as the foreign parent object.
+          git fetch --depth=1 https://github.com/smartmontools/smartmontools.git f276b249fdc84019403491303479485030ac7c80
+          git checkout -B "$BRANCH" origin/main
+          echo "foreign-parent test $(date -u +%s)" > docs/exp-foreign-parent.md
+          git add docs/exp-foreign-parent.md
+          TREE="$(git write-tree)"
+          # Native tree + a foreign parent (upstream tag commit). No workflow
+          # file changes, no upstream-identical content.
+          NEW="$(git commit-tree "$TREE" -p origin/main -p f276b249fdc84019403491303479485030ac7c80 -m 'test(exp): native tree with foreign parent')"
+          git update-ref "refs/heads/$BRANCH" "$NEW"
+          git push origin "$BRANCH"
+          gh pr create --base main --head "$BRANCH" \
+            --title "EXP foreign-parent-clean ${{ github.run_id }}" \
+            --body "foreign-parent-clean: head commit has parent2 = upstream f276b249 (foreign), tree otherwise matches main + one tiny file."
+          echo "SUCCESS: foreign-parent-clean PR created"
+
+      - name: Scenario foreign-head
+        if: inputs.scenario == 'foreign-head'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euxo pipefail
+          BRANCH="exp/foreign-head-${{ github.run_id }}"
+          git fetch origin main
+          # 646c05a15 = the historical foreign 2-parent re-vendor merge.
+          git fetch origin refs/pull/28/head:refs/exp/oldhead
+          git checkout -B "$BRANCH" refs/exp/oldhead
+          git push origin "$BRANCH"
+          gh pr create --base main --head "$BRANCH" \
+            --title "EXP foreign-head ${{ github.run_id }}" \
+            --body "foreign-head: pushes the historical foreign merge head 646c05a15 to a fresh branch and creates a PR."
+          echo "SUCCESS: foreign-head PR created"
