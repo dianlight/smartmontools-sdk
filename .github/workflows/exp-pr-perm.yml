@@ -20,6 +20,7 @@ on:
           - foreign-parent-clean
           - foreign-merge
           - no-head
+          - existing-real-head
       sha:
         description: "Upstream commit SHA (gitlink-only, upstream-subset)"
         required: false
@@ -318,3 +319,21 @@ jobs:
           set -e
           echo "exit2=$RC2"
           echo "$OUT2"
+
+      - name: Scenario existing-real-head
+        if: inputs.scenario == 'existing-real-head'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euxo pipefail
+          # update-smartmontools-7.5 is already at 6f664f6d0 (pushed by the
+          # failing real workflow run). No push here — just create the PR from
+          # the existing head, with the same title/body as the real workflow.
+          git fetch origin update-smartmontools-7.5
+          echo "branch head: $(git rev-parse FETCH_HEAD)"
+          gh pr create --base main --head update-smartmontools-7.5 \
+            --title "Merge smartmontools RELEASE_7_5 (v7.5)" \
+            --body "Automated merge of upstream release tag \`RELEASE_7_5\` into \`native/\`, carrying the real source diff (this is a genuine \`git merge\`, not a submodule bump — see docs/architecture/repository-layout.md).
+
+          Once this PR merges to \`main\`, \`tag-core-release.yml\` will detect the merge, compute the next core version (\`scripts/next-core-version.sh\`), tag it, and dispatch \`release-core.yml\` — which builds every target, publishes the core release, and then dispatches \`release-bindings-go.yml\` to publish a paired bindings release at the same version. If this merge happens to change nothing in the native-core build artifact (see \`scripts/core-artifact-changed.sh\`), that gate will skip tagging and open a tracking issue instead of shipping a no-op release."
+          echo "SUCCESS: existing-real-head PR created"
