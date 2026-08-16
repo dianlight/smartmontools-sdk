@@ -1,0 +1,221 @@
+name: replica-real
+
+on:
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Bypass the already-merged check and force a re-vendoring run (merge + PR)"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  check-update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: true
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Skip if an update PR is already open
+        id: existing
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # A conflicted merge attempt is pushed as-is for a human to resolve
+          # (see the merge step below); re-running this job must never
+          # force-push over that in-progress resolution.
+          OPEN_BRANCH=$(gh pr list --state open --json headRefName \
+            -q '.[] | select(.headRefName | startswith("update-smartmontools-")) | .headRefName' | head -n1)
+          if [ -n "${OPEN_BRANCH}" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "An update PR is already open on ${OPEN_BRANCH} — skipping until it is merged or closed."
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Fetch upstream and check for an unmerged release
+        id: check
+        if: steps.existing.outputs.skip == 'false'
+        run: |
+          git remote add upstream https://github.com/smartmontools/smartmontools.git
+          git fetch upstream --tags
+
+          LATEST_TAG=$(git tag -l 'RELEASE_*' --sort=-version:refname | head -n1)
+          if [ -z "$LATEST_TAG" ]; then
+            echo "No upstream release tags found"
+            echo "has_update=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "Latest upstream release tag: ${LATEST_TAG}"
+
+          CURRENT_GITLINK="$(git rev-parse HEAD:native/upstream)"
+          TAG_COMMIT="$(git rev-parse "${LATEST_TAG}^{commit}")"
+          echo "Current native/upstream gitlink: ${CURRENT_GITLINK}"
+          echo "Latest upstream release tag commit: ${TAG_COMMIT} (${LATEST_TAG})"
+
+          if [ "$CURRENT_GITLINK" = "$TAG_COMMIT" ] && [ "${{ github.event.inputs.force }}" != "true" ]; then
+            echo "Already re-vendored into main"
+            echo "has_update=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Not yet re-vendored — will attempt to merge ${LATEST_TAG}"
+            echo "has_update=true" >> "$GITHUB_OUTPUT"
+            echo "new_tag=${LATEST_TAG}" >> "$GITHUB_OUTPUT"
+            VERSION="${LATEST_TAG#RELEASE_}"
+            VERSION="${VERSION//_/.}"
+            echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Merge upstream release and open a Pull Request
+        if: steps.check.outputs.has_update == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BRANCH="update-smartmontools-${{ steps.check.outputs.version }}"
+          VERSION="${{ steps.check.outputs.version }}"
+          TAG="${{ steps.check.outputs.new_tag }}"
+
+          git checkout -b "${BRANCH}"
+
+          (cd native/upstream && git fetch --tags origin && git checkout "${TAG}")
+          git add native/upstream
+
+          if git merge --no-commit --no-ff --allow-unrelated-histories "${TAG}"; then
+            MERGE_TREE="$(git write-tree)"
+            NEW_COMMIT="$(git commit-tree "${MERGE_TREE}" -p main -m "Re-vendor smartmontools ${TAG}
+
+          Automated re-vendoring merge of upstream release ${TAG} into native/,
+          plus the corresponding native/upstream gitlink bump.")"
+            git update-ref "refs/heads/${BRANCH}" "${NEW_COMMIT}"
+            git push origin "${BRANCH}" --force
+
+            gh pr create \
+              --title "Merge smartmontools ${TAG} (v${VERSION})" \
+              --body "Automated merge of upstream release tag \`${TAG}\` into \`native/\`, carrying the real source diff (this is a genuine \`git merge\`, not a submodule bump — see docs/architecture/repository-layout.md).
+
+          Once this PR merges to \`main\`, \`tag-core-release.yml\` will detect the merge, compute the next core version (\`scripts/next-core-version.sh\`), tag it, and dispatch \`release-core.yml\` — which builds every target, publishes the core release, and then dispatches \`release-bindings-go.yml\` to publish a paired bindings release at the same version. If this merge happens to change nothing in the native-core build artifact (see \`scripts/core-artifact-changed.sh\`), that gate will skip tagging and open a tracking issue instead of shipping a no-op release." \
+              --base main \
+              --head "${BRANCH}"
+          else
+            CONFLICTS=$(git diff --name-only --diff-filter=U)
+            git add -A
+            MERGE_TREE="$(git write-tree)"
+            NEW_COMMIT="$(git commit-tree "${MERGE_TREE}" -p main -m "Re-vendor smartmontools ${TAG} (CONFLICTS — needs manual resolution)
+
+          Conflicting paths:
+          ${CONFLICTS}")"
+            git update-ref "refs/heads/${BRANCH}" "${NEW_COMMIT}"
+            git push origin "${BRANCH}" --force
+
+            gh pr create \
+              --draft \
+              --title "Merge smartmontools ${TAG} (v${VERSION}) — CONFLICTS" \
+              --body "Automated merge of upstream release tag \`${TAG}\` hit conflicts and needs manual resolution. The conflict markers are committed as-is on this branch — checkout \`${BRANCH}\`, resolve the markers below, then \`git add\` and amend or add a follow-up commit.
+
+          ### Conflicting paths
+          \`\`\`
+          ${CONFLICTS}
+          \`\`\`
+
+          This is the expected common case: our tree has deliberately deleted the smartctl/smartd CLI sources under \`native/src/\` that upstream still carries, so most upstream releases will conflict on exactly those paths. Once resolved and merged to \`main\`, the same cascade described in the non-conflict case applies." \
+              --base main \
+              --head "${BRANCH}"
+          fi
+
+  check-drivedb:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Determine upstream drivedb branch
+        id: branch
+        run: |
+          VER=$(grep -o 'VERSION: [0-9.]*' native/drivedb/drivedb.h | head -1 | awk '{print $2}')
+          echo "drivedb_branch=drivedb/${VER}" >> "$GITHUB_OUTPUT"
+          echo "Tracking upstream branch: drivedb/${VER}"
+
+      - name: Fetch upstream drivedb.h
+        id: fetch
+        run: |
+          UPSTREAM_BRANCH="${{ steps.branch.outputs.drivedb_branch }}"
+          git fetch --depth=1 https://github.com/smartmontools/smartmontools.git "${UPSTREAM_BRANCH}"
+          git show FETCH_HEAD:smartmontools/drivedb.h > /tmp/upstream_drivedb.h
+          if diff -q native/drivedb/drivedb.h /tmp/upstream_drivedb.h > /dev/null; then
+            echo "has_update=false" >> "$GITHUB_OUTPUT"
+            echo "drivedb.h is already up to date"
+          else
+            echo "has_update=true" >> "$GITHUB_OUTPUT"
+            echo "drivedb.h has upstream updates"
+          fi
+
+      - name: Create or refresh drivedb PR
+        if: steps.fetch.outputs.has_update == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          UPSTREAM_BRANCH="${{ steps.branch.outputs.drivedb_branch }}"
+          PR_BRANCH="update-drivedb"
+
+          NEW_DRIVES=$(diff native/drivedb/drivedb.h /tmp/upstream_drivedb.h \
+            | grep '^+  { "' \
+            | grep -v '"VERSION:\|"DEFAULT' \
+            | sed 's/^+  { "\([^"]*\)".*/- \1/' \
+            | sort -u)
+
+          cp /tmp/upstream_drivedb.h native/drivedb/drivedb.h
+          scripts/sync-drivedb-go.sh
+
+          git checkout -B "${PR_BRANCH}" HEAD
+          git add native/drivedb/drivedb.h bindings/go/backends/exec/drivedb.h bindings/go/backends/exec/drivedb_version.go
+          git commit -m "chore: update drivedb.h from upstream ${UPSTREAM_BRANCH}"
+          git push origin "${PR_BRANCH}" --force
+
+          if [ -n "$NEW_DRIVES" ]; then
+            DRIVES_SECTION="### New/updated drive entries
+
+          ${NEW_DRIVES}"
+          else
+            DRIVES_SECTION="_No new drive families detected (attribute or firmware updates only)._"
+          fi
+
+          cat > /tmp/pr_body.md << EOF
+          Automated update of \`native/drivedb/drivedb.h\` (and its generated \`bindings/go/backends/exec/\` copy) from upstream [\`${UPSTREAM_BRANCH}\`](https://github.com/smartmontools/smartmontools/tree/${UPSTREAM_BRANCH}).
+
+          ${DRIVES_SECTION}
+
+          ---
+          _This PR was created automatically by the submodule update checker workflow._
+          EOF
+
+          EXISTING_PR=$(gh pr list --head "${PR_BRANCH}" --state open --json number -q '.[0].number // empty')
+          if [ -n "$EXISTING_PR" ]; then
+            echo "Refreshing existing PR #${EXISTING_PR}"
+            gh pr edit "${EXISTING_PR}" --body-file /tmp/pr_body.md
+          else
+            gh pr create \
+              --title "Update drivedb.h from upstream ${UPSTREAM_BRANCH}" \
+              --body-file /tmp/pr_body.md \
+              --base main \
+              --head "${PR_BRANCH}"
+          fi
