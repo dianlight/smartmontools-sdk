@@ -20,6 +20,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          submodules: true
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -81,6 +82,7 @@ jobs:
         if: steps.check.outputs.has_update == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_DEBUG: api
         run: |
           BRANCH="update-smartmontools-${{ steps.check.outputs.version }}"
           VERSION="${{ steps.check.outputs.version }}"
