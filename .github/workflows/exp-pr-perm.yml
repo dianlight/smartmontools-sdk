@@ -345,12 +345,15 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euxo pipefail
-          # Same head (6f664f6d0), same branch, same title/body as the failing
-          # real workflow run — but force-pushed from THIS (exp) workflow and
-          # then a PR created immediately, replicating the push+create timing.
+          # Same TREE (8051f791), same branch, same title/body as the failing
+          # real workflow run — but the head is re-created as a NEW commit so
+          # the force-push is real, then a PR is created immediately,
+          # replicating the push+create timing of the real workflow.
           git fetch origin main
           git fetch origin update-smartmontools-7.5:refs/exp/realhead
-          git checkout -B update-smartmontools-7.5 refs/exp/realhead
+          TREE="$(git rev-parse refs/exp/realhead^{tree})"
+          NEW="$(git commit-tree "$TREE" -p origin/main -m 'Re-vendor smartmontools RELEASE_7_5')"
+          git checkout -B update-smartmontools-7.5 "$NEW"
           git push origin update-smartmontools-7.5 --force
           gh pr create --base main --head update-smartmontools-7.5 \
             --title "Merge smartmontools RELEASE_7_5 (v7.5)" \
