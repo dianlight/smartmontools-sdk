@@ -18,7 +18,8 @@ on:
           - force-replica2-nosleep
           - force-replica2-sleep
           - foreign-parent-clean
-          - foreign-head
+          - foreign-merge
+          - no-head
       sha:
         description: "Upstream commit SHA (gitlink-only, upstream-subset)"
         required: false
@@ -268,19 +269,52 @@ jobs:
             --body "foreign-parent-clean: head commit has parent2 = upstream f276b249 (foreign), tree otherwise matches main + one tiny file."
           echo "SUCCESS: foreign-parent-clean PR created"
 
-      - name: Scenario foreign-head
-        if: inputs.scenario == 'foreign-head'
+      - name: Scenario foreign-merge
+        if: inputs.scenario == 'foreign-merge'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euxo pipefail
-          BRANCH="exp/foreign-head-${{ github.run_id }}"
+          BRANCH="exp/foreign-merge-${{ github.run_id }}"
           git fetch origin main
-          # 646c05a15 = the historical foreign 2-parent re-vendor merge.
+          # 646c05a15 = the historical 08-14 failing re-vendor merge head.
           git fetch origin refs/pull/28/head:refs/exp/oldhead
-          git checkout -B "$BRANCH" refs/exp/oldhead
+          # Fetch the upstream tag commit as the foreign parent object.
+          git fetch --depth=1 https://github.com/smartmontools/smartmontools.git f276b249fdc84019403491303479485030ac7c80
+          # Recreate the 08-14 failing head on CURRENT main: same foreign
+          # 2-parent merge (parent2 = upstream f276b249) and same full
+          # re-vendor tree (smartmontools/* + gitlink), but workflow files
+          # match current main so the push is permitted.
+          git checkout -B "$BRANCH" origin/main
+          git checkout refs/exp/oldhead -- smartmontools native/upstream
+          TREE="$(git write-tree)"
+          NEW="$(git commit-tree "$TREE" -p origin/main -p f276b249fdc84019403491303479485030ac7c80 -m 'test(exp): recreate 08-14 foreign re-vendor merge head on current main')"
+          git update-ref "refs/heads/$BRANCH" "$NEW"
           git push origin "$BRANCH"
           gh pr create --base main --head "$BRANCH" \
-            --title "EXP foreign-head ${{ github.run_id }}" \
-            --body "foreign-head: pushes the historical foreign merge head 646c05a15 to a fresh branch and creates a PR."
-          echo "SUCCESS: foreign-head PR created"
+            --title "EXP foreign-merge ${{ github.run_id }}" \
+            --body "foreign-merge: recreates the 08-14 failing head (2-parent merge, foreign parent f276b249, full re-vendor diff) on current main."
+          echo "SUCCESS: foreign-merge PR created"
+
+      - name: Scenario no-head
+        if: inputs.scenario == 'no-head'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euxo pipefail
+          BRANCH="exp/does-not-exist-${{ github.run_id }}"
+          # Create a PR for a branch that does not exist, to capture the
+          # exact error text GitHub returns for a missing/stale head ref.
+          set +e
+          OUT="$(gh pr create --base main --head "$BRANCH" --title "EXP no-head ${{ github.run_id }}" --body "no-head test" 2>&1)"
+          RC=$?
+          set -e
+          echo "exit=$RC"
+          echo "$OUT"
+          # Re-run with --json to also capture structured output if available
+          set +e
+          OUT2="$(gh pr create --base main --head "$BRANCH" --title "EXP no-head ${{ github.run_id }}" --body "no-head test" --json number,url 2>&1)"
+          RC2=$?
+          set -e
+          echo "exit2=$RC2"
+          echo "$OUT2"
