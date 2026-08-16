@@ -22,6 +22,7 @@ on:
           - no-head
           - existing-real-head
           - real-head-push-create
+          - pure-shape
       sha:
         description: "Upstream commit SHA (gitlink-only, upstream-subset)"
         required: false
@@ -359,3 +360,32 @@ jobs:
             --title "Merge smartmontools RELEASE_7_5 (v7.5)" \
             --body "push+create from exp workflow with the real failing head."
           echo "SUCCESS: real-head-push-create PR created"
+
+      - name: Scenario pure-shape
+        if: inputs.scenario == 'pure-shape'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euxo pipefail
+          # Reproduce the EXACT failing real-run shape from THIS (exp) workflow:
+          # head = base + 1 single-parent commit, diff = ONLY smartmontools/*
+          # (same tree the real workflow produced), pushed then PR created
+          # immediately. Eliminates the workflow-file variable.
+          git fetch origin main
+          git fetch origin update-smartmontools-7.5:refs/exp/realhead
+          SMTREE="$(git rev-parse refs/exp/realhead:smartmontools)"
+          git checkout -B tmp-head origin/main
+          git rm -r --cached smartmontools >/dev/null 2>&1 || true
+          git read-tree --prefix=smartmontools/ "${SMTREE}"
+          NEW_TREE="$(git write-tree)"
+          NEW_COMMIT="$(git commit-tree "${NEW_TREE}" -p origin/main -m 'Re-vendor smartmontools RELEASE_7_5')"
+          git update-ref refs/heads/update-smartmontools-7.5 "${NEW_COMMIT}"
+          echo "head: ${NEW_COMMIT}  tree: ${NEW_TREE}"
+          git diff --stat origin/main "${NEW_COMMIT}" -- . ':(exclude)smartmontools' | tail -2
+          git push origin update-smartmontools-7.5 --force
+          gh pr create \
+            --title "Merge smartmontools RELEASE_7_5 (v7.5)" \
+            --body "pure-shape: head = base+1, single parent, diff = ONLY smartmontools/*" \
+            --base main \
+            --head update-smartmontools-7.5
+          echo "SUCCESS: pure-shape PR created"
