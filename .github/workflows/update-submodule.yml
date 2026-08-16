@@ -123,7 +123,16 @@ jobs:
             git update-ref "refs/heads/${BRANCH}" "${NEW_COMMIT}"
             git push origin "${BRANCH}" --force
 
+            # `gh` resolves the "current repository" from git remotes and (in
+            # non-interactive CI runs) picks the first one after sorting, where
+            # a remote named `upstream` beats `origin`. The check step above
+            # adds `upstream` pointing at smartmontools/smartmontools.git, so
+            # without `--repo` the createPullRequest call would target that
+            # repo and fail with "Resource not accessible by integration
+            # (createPullRequest)" — the GITHUB_TOKEN integration has no
+            # permissions there. Pin the repository explicitly.
             gh pr create \
+              --repo "${GITHUB_REPOSITORY}" \
               --title "Merge smartmontools ${TAG} (v${VERSION})" \
               --body "Automated merge of upstream release tag \`${TAG}\` into \`native/\`, carrying the real source diff (this is a genuine \`git merge\`, not a submodule bump — see docs/architecture/repository-layout.md).
 
@@ -144,6 +153,7 @@ jobs:
             git push origin "${BRANCH}" --force
 
             gh pr create \
+              --repo "${GITHUB_REPOSITORY}" \
               --draft \
               --title "Merge smartmontools ${TAG} (v${VERSION}) — CONFLICTS" \
               --body "Automated merge of upstream release tag \`${TAG}\` hit conflicts and needs manual resolution. The conflict markers are committed as-is on this branch — checkout \`${BRANCH}\`, resolve the markers below, then \`git add\` and amend or add a follow-up commit.
