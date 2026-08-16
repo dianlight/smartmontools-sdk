@@ -103,6 +103,7 @@ jobs:
             git push origin "${BRANCH}" --force
 
             gh pr create \
+              --repo "${GITHUB_REPOSITORY}" \
               --title "Merge smartmontools ${TAG} (v${VERSION})" \
               --body "Automated merge of upstream release tag \`${TAG}\` into \`native/\`, carrying the real source diff (this is a genuine \`git merge\`, not a submodule bump — see docs/architecture/repository-layout.md).
 
@@ -121,6 +122,7 @@ jobs:
             git push origin "${BRANCH}" --force
 
             gh pr create \
+              --repo "${GITHUB_REPOSITORY}" \
               --draft \
               --title "Merge smartmontools ${TAG} (v${VERSION}) — CONFLICTS" \
               --body "Automated merge of upstream release tag \`${TAG}\` hit conflicts and needs manual resolution. The conflict markers are committed as-is on this branch — checkout \`${BRANCH}\`, resolve the markers below, then \`git add\` and amend or add a follow-up commit.
