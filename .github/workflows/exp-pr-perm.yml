@@ -14,6 +14,9 @@ on:
           - same-ref
           - force-replica
           - force-fresh
+          - wf-change
+          - force-replica2-nosleep
+          - force-replica2-sleep
       sha:
         description: "Upstream commit SHA (gitlink-only, upstream-subset)"
         required: false
@@ -182,3 +185,59 @@ jobs:
             --title "EXP force-fresh ${{ github.run_id }}" \
             --body "Force-fresh: fresh branch force-pushed through old foreign head then native head, then create."
           echo "SUCCESS: force-fresh PR created"
+
+      - name: Scenario wf-change
+        if: inputs.scenario == 'wf-change'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euxo pipefail
+          BRANCH="exp/wf-change-${{ github.run_id }}"
+          git fetch origin main
+          git checkout -B "$BRANCH" origin/main
+          echo "# experiment: workflow file modification" >> .github/workflows/exp-pr-perm.yml
+          git add .github/workflows/exp-pr-perm.yml
+          git commit -m "test(exp): modify workflow file"
+          git push origin "$BRANCH"
+          gh pr create --base main --head "$BRANCH" \
+            --title "EXP wf-change ${{ github.run_id }}" \
+            --body "wf-change: PR whose diff modifies a workflow file."
+          echo "SUCCESS: wf-change PR created"
+
+      - name: Scenario force-replica2-nosleep
+        if: inputs.scenario == 'force-replica2-nosleep'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euxo pipefail
+          # Prerequisite: the branch update-smartmontools-7.5 is at 646c05a15
+          # (old foreign head) via a user-token setup push.
+          git fetch origin main
+          git fetch origin update-smartmontools-7.5
+          git fetch origin exp/saved-native-head:refs/exp/native
+          git checkout -B update-smartmontools-7.5 refs/exp/native
+          git push origin update-smartmontools-7.5 --force
+          gh pr create --base main --head update-smartmontools-7.5 \
+            --title "EXP force-replica2-nosleep ${{ github.run_id }}" \
+            --body "force-replica2-nosleep: exact failing sequence (646c05a15 -> force-push bb36d911 -> create immediately)."
+          echo "SUCCESS: force-replica2-nosleep PR created"
+
+      - name: Scenario force-replica2-sleep
+        if: inputs.scenario == 'force-replica2-sleep'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euxo pipefail
+          # Prerequisite: the branch update-smartmontools-7.5 is at 646c05a15
+          # (old foreign head) via a user-token setup push.
+          git fetch origin main
+          git fetch origin update-smartmontools-7.5
+          git fetch origin exp/saved-native-head:refs/exp/native
+          git checkout -B update-smartmontools-7.5 refs/exp/native
+          git push origin update-smartmontools-7.5 --force
+          # Allow GitHub's ref pipeline to settle before createPullRequest.
+          sleep 30
+          gh pr create --base main --head update-smartmontools-7.5 \
+            --title "EXP force-replica2-sleep ${{ github.run_id }}" \
+            --body "force-replica2-sleep: same as nosleep but with 30s settle delay after force-push."
+          echo "SUCCESS: force-replica2-sleep PR created"
