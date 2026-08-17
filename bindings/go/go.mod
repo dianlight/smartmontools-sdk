@@ -22,7 +22,7 @@ retract (
 require (
 	github.com/dianlight/tlog v0.2.2
 	github.com/ebitengine/purego v0.10.2
-	github.com/stretchr/testify v1.11.1
+	github.com/stretchr/testify v1.12.0
 )
 
 require (
