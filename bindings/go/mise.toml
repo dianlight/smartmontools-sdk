@@ -1,5 +1,5 @@
 [tools]
-go = "1.26"
+go = "1.27.1"
 "go:honnef.co/go/tools/cmd/staticcheck" = "latest"
 "go:github.com/princjef/gomarkdoc/cmd/gomarkdoc" = "latest"
 github-cli = "latest"
