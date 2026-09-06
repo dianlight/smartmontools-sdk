@@ -6,7 +6,7 @@ package exec
 
 // DrivedbUpstreamCommit is the upstream smartmontools commit SHA from which
 // the embedded drivedb.h was taken.
-const DrivedbUpstreamCommit = "98360bf7d5d9"
+const DrivedbUpstreamCommit = "5e6cb183947e"
 
 // DrivedbUpstreamDate is the commit date of DrivedbUpstreamCommit in RFC 3339 format.
-const DrivedbUpstreamDate = "2026-07-20T17:31:50Z"
+const DrivedbUpstreamDate = "2026-09-01T16:20:03Z"
