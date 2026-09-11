@@ -66,6 +66,12 @@ func loadDrivedbAddendum() map[string]string {
 
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
+		// Strip // comments outside quoted strings before extracting
+		// fields. Upstream drivedb.h contains comment lines inside
+		// entries with quotes (e.g. // 0x1091 (0x1001): 2.5" HDD
+		// "Porsche" series, ...) whose quoted sections would otherwise
+		// be mistaken for struct fields and shift the presets column.
+		line = stripCPPLineComment(line)
 
 		// Check if this is the start of a USB entry
 		if usbEntryPattern.MatchString(line) {
@@ -123,6 +129,31 @@ func loadDrivedbAddendum() map[string]string {
 
 	tlog.Debug("Loaded drivedb from smartmontools drivedb.h", "entries", len(cache))
 	return cache
+}
+
+// stripCPPLineComment cuts a trailing // comment from line, but only when
+// the // occurs outside of double-quoted strings. A line that is entirely
+// a comment (trimmed form starts with //) yields an empty string.
+func stripCPPLineComment(line string) string {
+	inQuotes := false
+	for i := 0; i+1 < len(line); i++ {
+		c := line[i]
+		if c == '"' {
+			// Ignore escaped quotes (\").
+			escaped := false
+			for j := i - 1; j >= 0 && line[j] == '\\'; j-- {
+				escaped = !escaped
+			}
+			if !escaped {
+				inQuotes = !inQuotes
+			}
+			continue
+		}
+		if !inQuotes && c == '/' && line[i+1] == '/' {
+			return strings.TrimSpace(line[:i])
+		}
+	}
+	return line
 }
 
 // usbIDPairPattern matches a USB vendor:product ID pair where either side
