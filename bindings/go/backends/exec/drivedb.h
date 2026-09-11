@@ -1,10 +1,10 @@
 /*
- * drivedb.h - smartmontools drive database file
+ * drivedb.h - smartmontools 7.5 drive database file
  *
  * Home page of code is: https://www.smartmontools.org
  *
  * Copyright (C) 2003-11 Philip Williams, Bruce Allen
- * Copyright (C) 2008-25 Christian Franke
+ * Copyright (C) 2008-26 Christian Franke
  *
  * SPDX-License-Identifier: GPL-2.0-or-later
  */
@@ -68,7 +68,7 @@
 /*
 const drive_settings builtin_knowndrives[] = {
  */
-  { "VERSION: 7.5/6204 2026-07-20 17:31:50 +0000 98360bf7d5d9",
+  { "VERSION: 7.5/6293 2026-09-09 11:17:15 +0000 76e88dac82ba",
     "-", "-",
     "Version information",
     ""
@@ -746,8 +746,9 @@ const drive_settings builtin_knowndrives[] = {
     "-v 245,raw16(raw16),Bit_Error_Count"
   },
   { "Maxio based SSDs (variant 4)", // MAS1102
-    "Lexar SSD NS100 ((128|256|512)G|[12]T)B", // Lexar NS100, tested with Lexar SSD NS100 256GB/SN17776
-    "SN177[0-9]{2}", "",
+    "Lexar SSD NS100 ((128|256|512)G|[12]T)B", // Lexar NS100, tested with
+      // Lexar SSD NS100 256GB/SN17776, Lexar SSD NS100 256GB/V1.0.5A
+    "SN177[0-9]{2}|V1\\.0\\.5A", "",
     "-v 5,raw16(raw16),New_Bad_Blk_Count "
   //"-v 9,raw24(raw8),Power_On_Hours "
   //"-v 12,raw48,Power_Cycle_Count "
@@ -1841,18 +1842,19 @@ const drive_settings builtin_knowndrives[] = {
     "INTEL SSDSC(1N|[12]B)[ABGPX]((080|100|120|150|160|200|240|300|400|480|600|800)[GH][3467][CERT]?|(012|016)T[46])|"
       // A = S3700, B*4 = S3500, B*6 = S3510, P = 730, X = S3610
       // Dell ships drives with model of the form SSDSC2BB120G4R
-    "VK000(120|240|480)GWSXF", // tested with VK000480GWSXF/HPG2 (HPE INTEL SSDSC2BB480G4)
+    "VK000(120|240|480)G(WSXF|XNZA)", // tested with VK000480GWSXF/HPG2 (HPe INTEL SSDSC2BB480G4),
+      // VK000480GXNZA/HPG1 (HPe)
     "", "",
   //"-v 3,raw16(avg16),Spin_Up_Time "
   //"-v 4,raw48,Start_Stop_Count "
   //"-v 5,raw16(raw16),Reallocated_Sector_Ct "
   //"-v 9,raw24(raw8),Power_On_Hours "
-    "-v 11,raw48,Unknown_Intel_Attribute " // VK000480GWSXF
+    "-v 11,raw48,Unknown_Intel_Attribute " // VK*
   //"-v 12,raw48,Power_Cycle_Count "
     "-v 170,raw48,Available_Reservd_Space "
     "-v 171,raw48,Program_Fail_Count "
     "-v 172,raw48,Erase_Fail_Count "
-    "-v 173,raw48,Unknown_Intel_Attribute " // VK000480GWSXF
+    "-v 173,raw48,Percent_Lifetime_Remain " // 100 - "Percentage Used Endurance Indicator", VK*
     "-v 174,raw48,Unsafe_Shutdown_Count "
     "-v 175,raw16(raw16),Power_Loss_Cap_Test "
     "-v 183,raw48,SATA_Downshift_Count "
@@ -2383,8 +2385,8 @@ const drive_settings builtin_knowndrives[] = {
       // SanDisk SD6SP1M128G1102/X231302
     "SanDisk SD7S[BN][67]S-?(128|256|512|960)G(1122|-1006)?|" // X300 (88SS9189?), tested with
       // SanDisk SD7SB6S128G1122/X3310000, SanDisk SD7SN6S-512G-1006/X3511006, SanDisk SD7SB7S960G/X36310DC
-    "SanDisk SD8[ST][BN]8U-?((128|256|512)G|1T00)(1122|-10[01]6)|" // X400 (88SS1074), tested with SanDisk SD8SB8U128G1122/X4120000
-      // SanDisk SD8TB8U-512G-1016/X4163116
+    "SanDisk SD8[ST][BN]8U-?((128|256|512)G|1T00)(1122|2000|-10[01]6)|" // X400 (88SS1074), tested with SanDisk SD8SB8U128G1122/X4120000
+      // SanDisk SD8TB8U-512G-1016/X4163116, SanDisk SD8SB8U1T002000/X4163000
     "SanDisk SD9S[BN]8W-?((128|256|512)G|[12]T00)(1122|-1006|1020)|" // X600, tested with SanDisk SD9SB8W128G1122/X6107000, SD9SB8W-512G-1006/X6103006
       // SanDisk SD9SB8W1T001122/X6107000, SD9SB8W256G1122/X6107000, SanDisk SD9SN8W128G1020/X6101020
     "SanDisk SDSSDA-((120|240|480)G|[12]T00)|" // Plus, tested with SanDisk SDSSDA-2T00/411040RL
@@ -2713,12 +2715,13 @@ const drive_settings builtin_knowndrives[] = {
       // INTENSO SSD/W1025B0 (256 GB)
     "Intenso  ?SSD( S(ata|ATA) ?III)?|" // tested with Intenso SSD/Q1107A0, Intenso  SSD Sata III/P0510E,
       // Intenso SSD Sata III/R0817B0, Intenso SSD Sata III/S0222A0, Intenso SSD Sata III/V0303B0,
-      // Intenso SSD SATAIII/W0825A0,
+      // Intenso SSD Sata III/W0814B0, Intenso SSD SATAIII/W0825A0
     "KingFast|" // tested with KingFast/P0725A (F6M), KingFast/S0424A0 (120GB), KingFast/S1128B0 (512GB)
     "KSM512|" // KingSpec, tested with KSM512/S0509A0
     "LDLC|" // tested with LDLC/KFS03005
     "M\\.2 SSD (128|256|512)GB|" // tested with M.2 SSD 512GB/2109XKR (attributes 241/242: not 32MiB)
-    "Netac MobileDataStar|" // tested with Netac MobileDataStar/HPS2227I (0x0dd8:0x0562)
+    "Netac (MobileDataStar|SSD (120|240|480|960)GB)|" // tested with
+      // Netac MobileDataStar/HPS2227I (0x0dd8:0x0562), Netac SSD 480GB/HP5310B3 (Netac N535S)
     "ORICO|" // ORICO S500PRO, tested with ORICO/W0201A0 (2TB)
     "ORTIAL SSD|" // tested with ORTIAL SSD/U0202A0 (128GB)
     "P3-(128|256|512|[124]TB)|" // Kingspec P3, tested with P3-256/U0329A0 (attributes 241/242: not 32MiB)
@@ -2740,10 +2743,10 @@ const drive_settings builtin_knowndrives[] = {
        // may also exist with different controllers (tickets #1626, #1629, #1774, #1930, GH issues/185),
     "Vi550 S3", // another variant (ticket #1899), tested with Vi550 S3/HP3418C5
     "2109XKR|"
-    "HP(3418C5|3C09BA|S2227I)|KFS03005|P0510E|P0725A|Q(0627|1107)A0|R(0529A|0817B0)|"
+    "HP(3418C5|3C09BA|5310B3|S2227I)|KFS03005|P0510E|P0725A|Q(0627|1107)A0|R(0529A|0817B0)|"
     "S(0222|0424|0509|0618|1211|1230)A0|S112[78]B0|T0(311|519|910)A0|"
     "U((0202|03[02]9|0401|0506|1124|1209)A|0302B)0|V0((414|609|823)A|(303|718)B)0|V1(027|102)A0|VE0R6327|"
-    "W((0201|0413|0714|0825)A|(0419|1025)B)0|Y0(106A|307B)0|SHY09A0",
+    "W((0201|0413|0714|0825)A|(0419|0814|1025)B)0|Y0(106A|307B)0|SHY09A0",
     "",
     "-v 148,raw48,Total_SLC_Erase_Ct "
     "-v 149,raw48,Max_SLC_Erase_Ct "
@@ -4232,14 +4235,15 @@ const drive_settings builtin_knowndrives[] = {
   },
   { "Western Digital Ultrastar (He10/12)", // WD white label, tested with
       // WDC WD80EMAZ-00WJTA0/83.H0A83 (Easystore 0x1058:0x25fb),
-      // WDC WD80EZAZ-11TDBA0/83.H0A83, WDC WD100EMAZ-00WJTA0/83.H0A83,
-      // WDC WD100EZAZ-11TDBA0/83.H0A83, WDC WD120EMAZ-11BLFA0/81.00A81,
+      // WDC WD100EMAZ-00WJTA0/83.H0A83, WDC WD101EMAZ-11G7DA0/81.00A81,
+      // WDC WD120EMAZ-11BLFA0/81.00A81,
+      // WDC WD80EZAZ-11TDBA0/83.H0A83, WDC WD100EZAZ-11TDBA0/83.H0A83,
       // WDC WD140EDFZ-11A0VA0/81.00A81 (Easystore 0x1058:0x25fb),
       // WDC WD140EDGZ-11B2DA2/85.00A85, WDC WD140EDGZ-11B1PA0/85.00A85,
       // WDC WD160EDGZ-11BHMA0/85.00A85 (My Book),
       // WDC WD160EDGZ-11CMXA0/85.00A85 (My Book 0x1058:0x25ee),
       // WDC WD80EDAZ-11TA3A0/81.00A81, WDC WD120EDAZ-11F3RA0/81.00A81
-    "WDC WD(8|10|12|14|16)0E([MZ]A|DA|DF|DG)Z-.*",
+    "WDC WD((8|10|12|14|16)0E([MZ]A|DA|DF|DG)|101EMA)Z-.*",
     "", "", ""
   //"-v 22,raw16(raw16),Helium_Level" // not: WD80EDAZ
   },
@@ -5635,6 +5639,8 @@ const drive_settings builtin_knowndrives[] = {
       // WD Blue SA510 2.5 4TB/530309WD,  WD Blue SA510 M.2 2280 1000GB/52048100,
       // WD Red SA500 2.5 4TB/540400WD,
       // WD Red SA500 2.5 4TB/540500WD (printed label: WDS400T2R0A-68CKB0)
+    "MILAN II ((256|512)G|[12]T)B|" // tested with
+      // MILAN II 1TB/X6105100 (WD My Passport SSD, 0x1058:0x25f3)
     "SanDisk (Extreme )?Portable SSD|" // tested with SanDisk Portable SSD/UM5004RL
       // (SanDisk SDSSDE30-2T00, 0x0781:0x55b0),
       // SanDisk Extreme Portable SSD/415000RL (SanDisk SDSSDE60-1T00-G25, 0x0781:0x558c)
@@ -6447,23 +6453,11 @@ const drive_settings builtin_knowndrives[] = {
     "",
     "-d usbjmicron"
   },
-  { "USB: LaCie Rugged Triple Interface; ",
-    "0x059f:0x100c",
-    "", // 0x0001
-    "",
-    "-d sat"
-  },
   { "USB: LaCie Desktop Hard Drive;",
     "0x059f:0x1010",
     "",
     "",
     "-d usbsunplus"
-  },
-  { "USB: LaCie Desktop Hard Drive; ",
-    "0x059f:0x101[68]", // 0x1016: SAMSUNG HD103UJ
-    "", // 0x0001
-    "",
-    "-d sat"
   },
   { "USB: LaCie Desktop Hard Drive; JMicron",
     "0x059f:0x1019",
@@ -6483,58 +6477,21 @@ const drive_settings builtin_knowndrives[] = {
     "",
     "-d usbjmicron"
   },
-  { "USB: LaCie hard disk; ",
-    "0x059f:0x1029",
-    "", // 0x0100
-    "",
-    "-d sat"
-  },
-  { "USB: Lacie rikiki; JMicron",
+  { "USB: LaCie rikiki; JMicron",
     "0x059f:0x102a",
     "",
     "",
     "-d usbjmicron,x"
   },
-  { "USB: LaCie D2 USB3; LucidPort USB300 ",
-    "0x059f:0x103d",
-    "",
-    "",
-    "-d sat"
-  },
-  { "USB: LaCie rikiki USB 3.0; ",
-    "0x059f:0x10(49|57)",
-    "",
-    "",
-    "-d sat"
-  },
-  { "USB: LaCie minimus USB 3.0; ",
-    "0x059f:0x104a",
-    "",
-    "",
-    "-d sat"
-  },
-  { "USB: LaCie Rugged Mini USB 3.0; ",
-    "0x059f:0x1051",
-    "", // 0x0000
-    "",
-    "-d sat"
-  },
-  { "USB: LaCie P9230 (LAC302002); ",
-    "0x059f:0x1053",
-    "", // 0x0000
-    "",
-    "-d sat"
-  },
-  { "USB: LaCie Rugged Mini HDD; ",
-    "0x059f:0x106b",
-    "",
-    "",
-    "-d sat"
-  },
-  { "USB: LaCie; ", // 0x1070: ASMedia 1053 ?
-    "0x059f:0x10(6f|7[05]|b8)", // 0x0x10b8: d2 PROFESSIONAL
-    "", // 6f/70/b8=0x0001, 75=0x0000
-    "",
+  { "USB: LaCie; ",
+    "0x059f:0x10(0c|1[68]|29|3d|4[9a]|5[137]|6[bf]|7[05]|91|b8)",
+    "", // 0x100c (0x0001): Rugged Triple Interface,
+    "", // 0x1016 (0x0001): Desktop HDD (SAMSUNG HD103UJ), 0x1018: Desktop HDD,
+        // 0x1029 (0x0100): HDD, 0x103d: d2 (LucidPort USB300), 0x1049: Rikiki,
+        // 0x104a: Minimus, 0x1051 (0x0000): Rugged Mini,
+        // 0x1053 (0x0000): P9230 (LAC302002), 0x1057: Rikiki, 0x106b: Rugged Mini,
+        // 0x106f (0x0001), 0x1070 (0x0001): (ASMedia 1053 ?), 0x1075 (0x0000),
+        // 0x1091 (0x1001): 2.5" HDD "Porsche" series, 0x10b8 (0x0001): d2 PROFESSIONAL
     "-d sat"
   },
   // In-System Design
@@ -6675,9 +6632,9 @@ const drive_settings builtin_knowndrives[] = {
     "",
     "-d usbsunplus"
   },
-  { "USB: Freecom; ", // Intel labeled
-    "0x07ab:0xfc8f",
-    "", // 0x0000
+  { "USB: Freecom; ",
+    "0x07ab:0xfc(8f|a6)", // 0xfc8f (0x0000): Intel labeled,
+    "", // 0xfca6 (0x0100): Freecom mHDD Desktop
     "",
     "-d sat"
   },
@@ -7080,6 +7037,13 @@ const drive_settings builtin_knowndrives[] = {
     "",
     "-d sntasmedia" // limited info only
   },
+  // StarTech
+  { "USB: StarTech 1USB4-NVME-ENCLOSURE; ASMedia ASM2464PD", // USB3->PCIe (NVMe)
+    "0x14b0:0x020b",
+    "",
+    "",
+    "-d sntasmedia"
+  },
   // Super Top
   { "USB: Super Top generic enclosure; ",
     "0x14cd:0x6116",
@@ -7138,14 +7102,14 @@ const drive_settings builtin_knowndrives[] = {
     "-d sat"
   },
   { "USB: ; JMicron JMS581", // USB->SATA+PCIe (NVMe)
-    "0x152d:0x0581",
-    "", // 0x4204
+    "0x152d:0x0581", // 0x0581 (0x4204), 0x0581 (0x8204): ICY BOX IB-2915
     "",
-    "-d sntjmicron/sat"
+    "",
+    "-d sntjmicron/sat" // smartmontools >= a214aa796e89 (8.0): -d sat/sntjmicron
   },
   { "USB: ; JMicron",
     "0x152d:0x0583", // USB->SATA adapter using default id of JMS583 (see below)
-    "0x(0414|3202|9128)",
+    "0x(0205|0414|3202|9128)", // 0x9128: Wavlink Dual Bay Docking Station
     "",
     "-d sat"
   },
@@ -7534,10 +7498,10 @@ const drive_settings builtin_knowndrives[] = {
     "",
     "-d sat"
   },
-  { "USB: Lexar ES3/E6; JMicron",
-    "0x21c4:0x(0003|b06a)", // 0xb06a (0x0214): Lexar E6 LPAE06N-RNBNG NVMe enclosure
-    "", // 0x0003 (0x7102): Lexar ES3 Portable SSD (2TB)
-    "",
+  { "USB: Lexar; JMicron",
+    "0x21c4:0x(00(03|30)|b06a)", // 0xb06a (0x0214): Lexar E6 LPAE06N-RNBNG NVMe enclosure,
+    "", // 0x0003 (0x7102): Lexar ES3 Portable SSD (2TB),
+    "", // 0x0030 (0x7103): Lexar SL300 Portable SSD (2TB),
     "-d sntjmicron"
   },
   { "USB: Lexar E300; Realtek",
